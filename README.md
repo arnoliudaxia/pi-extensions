@@ -167,6 +167,15 @@ Hotkey changes are saved for terminal use and require Pi's `/reload`; this does
 not add browser hotkey handling. The manager uses Save And Apply rather than an
 unsaved draft Test.
 
+Manager actions include compact Unicode markers, such as `▶ Apply`, `✎ Edit`,
+`⧉ Duplicate`, `↔ Move`, `ⓘ View Details`, and `← Back`. Delete is marked
+`⚠ Delete` as a danger action. The standard Pi RPC select protocol carries only
+option strings and does not guarantee Markdown or ANSI color rendering, so the
+manager deliberately does not depend on red escape sequences. Pi Web and Pi's
+TUI both receive the same readable labels, while the manager maps only its fixed
+markers back to the stable action labels. Preset names remain separate from that
+mapping, including same-name User and Project presets.
+
 Project writes require trust at commit time. Unsafe configuration files are not
 overwritten. If the selected preset changes while a dialog is open, the manager
 rejects the stale write and asks you to reopen it. RPC mutations are serialized

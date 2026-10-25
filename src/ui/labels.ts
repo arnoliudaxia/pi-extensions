@@ -42,19 +42,61 @@ export const ACTIVATE_LABEL = "Activate";
 export const FILTER_LABEL = "Filter";
 export const STATUS_ACTION_LABEL = "Status";
 export const NEW_LABEL = "New";
+export const NEW_PRESET_LABEL = "New Preset";
 export const MANAGE_PRESETS_LABEL = "Manage Presets";
 export const EDIT_LABEL = "Edit";
 export const DUPLICATE_LABEL = "Duplicate";
 export const DELETE_LABEL = "Delete";
 export const CLEAR_LABEL = "Clear";
+export const CLEAR_ACTIVE_PRESET_LABEL = "Clear Active Preset";
 export const REORDER_LABEL = "Reorder";
 export const CLOSE_LABEL = "Close";
 export const BACK_LABEL = "Back";
 export const CURSOR_LABEL = "Cursor";
 export const MOVE_LABEL = "Move";
+export const MOVE_UP_LABEL = "Move Up";
+export const MOVE_DOWN_LABEL = "Move Down";
+export const VIEW_DETAILS_LABEL = "View Details";
+export const APPLY_LABEL = "Apply";
 export const PAGE_LABEL = "Page";
 export const SCROLL_LABEL = "Scroll";
 export const SELECT_LABEL = "Select";
 export const SAVE_LABEL = "Save";
 export const CANCEL_LABEL = "Cancel";
 export const TEST_LABEL = "Test (apply temporarily)";
+
+const MANAGER_ACTION_ICONS: ReadonlyMap<string, string> = new Map([
+  [NEW_PRESET_LABEL, "＋"],
+  [CLEAR_ACTIVE_PRESET_LABEL, "↺"],
+  [STATUS_ACTION_LABEL, "ⓘ"],
+  [CLOSE_LABEL, "×"],
+  [APPLY_LABEL, "▶"],
+  [EDIT_LABEL, "✎"],
+  [DUPLICATE_LABEL, "⧉"],
+  [MOVE_UP_LABEL, "↑"],
+  [MOVE_DOWN_LABEL, "↓"],
+  [VIEW_DETAILS_LABEL, "ⓘ"],
+  [DELETE_LABEL, "⚠"],
+  [BACK_LABEL, "←"],
+]);
+
+/** Add a client-safe visual marker to a preset-manager action. */
+export function formatManagerAction(label: string): string {
+  const icon =
+    MANAGER_ACTION_ICONS.get(label) ??
+    (label.startsWith(`${MOVE_LABEL} to `) ? "↔" : undefined);
+
+  return icon ? `${icon} ${label}` : label;
+}
+
+/** Resolve a displayed action back to its stable routing label. */
+export function resolveManagerAction(
+  choice: string | undefined,
+  labels: readonly string[],
+): string | undefined {
+  if (choice === undefined) return undefined;
+
+  return labels.find(
+    (label) => choice === label || choice === formatManagerAction(label),
+  );
+}

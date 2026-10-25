@@ -11,6 +11,7 @@ import type { PresetIdentity } from "../../../src/preset-identity.js";
 import * as store from "../../../src/store/api.js";
 import * as mutations from "../../../src/store/mutations.js";
 import type { Preset, PresetScope } from "../../../src/types.js";
+import { formatManagerAction } from "../../../src/ui/labels.js";
 import type { RpcPresetDraft } from "../../../src/ui/rpc-editor-types.js";
 import * as rpcEditor from "../../../src/ui/rpc-editor.js";
 import { makeStubModelRegistry } from "../../helpers/model-registry.js";
@@ -46,7 +47,11 @@ function harness(steps: readonly (string | number | undefined)[] = []) {
 
       if (typeof answer === "number") return Promise.resolve(options[answer]);
 
-      const choice = options.find((option) => option === answer);
+      const choice =
+        options.find((option) => option === answer) ??
+        (typeof answer === "string"
+          ? options.find((option) => option === formatManagerAction(answer))
+          : undefined);
 
       if (!choice)
         throw new Error(`Missing choice ${answer}: ${options.join(" | ")}`);
@@ -188,10 +193,10 @@ describe("preset manager dialogs", () => {
     await runPresetManager(setup.ctx, setup.deps);
 
     expect(setup.select).toHaveBeenCalledExactlyOnceWith("Presets Plus", [
-      "New Preset",
-      "Clear Active Preset",
-      "Status",
-      "Close",
+      "＋ New Preset",
+      "↺ Clear Active Preset",
+      "ⓘ Status",
+      "× Close",
     ]);
     expect(setup.notify).not.toHaveBeenCalled();
     expect(setup.custom).not.toHaveBeenCalled();
@@ -206,26 +211,26 @@ describe("preset manager dialogs", () => {
     await runPresetManager(setup.ctx, setup.deps);
 
     expect(setup.select.mock.calls[0]?.[1]).toEqual([
-      "New Preset",
+      "＋ New Preset",
       '1. "Deep Work" · Scope: User',
       '2. "Deep Work" · Scope: Project',
-      "Clear Active Preset",
-      "Status",
-      "Close",
+      "↺ Clear Active Preset",
+      "ⓘ Status",
+      "× Close",
     ]);
 
     expect(setup.select.mock.calls[1]).toEqual([
       '"Deep Work" · Project',
       [
-        "Apply",
-        "Edit",
-        "Duplicate",
-        "Move to User",
-        "Move Up",
-        "Move Down",
-        "View Details",
-        "Delete",
-        "Back",
+        "▶ Apply",
+        "✎ Edit",
+        "⧉ Duplicate",
+        "↔ Move to User",
+        "↑ Move Up",
+        "↓ Move Down",
+        "ⓘ View Details",
+        "⚠ Delete",
+        "← Back",
       ],
     ]);
     expect(setup.custom).not.toHaveBeenCalled();

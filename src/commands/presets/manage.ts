@@ -16,14 +16,21 @@ import {
 } from "../../store/mutations.js";
 import type { LoadedPreset } from "../../types.js";
 import {
+  APPLY_LABEL,
   BACK_LABEL,
+  CLEAR_ACTIVE_PRESET_LABEL,
   CLOSE_LABEL,
   DELETE_LABEL,
   DUPLICATE_LABEL,
   EDIT_LABEL,
+  formatManagerAction,
+  MOVE_DOWN_LABEL,
   MOVE_PRESET_TITLE,
-  NEW_LABEL,
+  MOVE_UP_LABEL,
+  NEW_PRESET_LABEL,
+  resolveManagerAction,
   STATUS_ACTION_LABEL,
+  VIEW_DETAILS_LABEL,
 } from "../../ui/labels.js";
 import { serializeForCopy, uniqueCopyName } from "../../ui/preset-copy.js";
 import type {
@@ -52,13 +59,6 @@ export interface PresetManagerDeps {
 export type PresetManagerExit =
   { readonly kind: "closed" } | { readonly kind: "reload-requested" };
 
-const NEW_PRESET_LABEL = `${NEW_LABEL} Preset`;
-const CLEAR_ACTIVE_LABEL = "Clear Active Preset";
-const APPLY_LABEL = "Apply";
-const MOVE_UP_LABEL = "Move Up";
-const MOVE_DOWN_LABEL = "Move Down";
-const DETAILS_LABEL = "View Details";
-
 /** Own one dialog loop and keep persistence outside the draft-only editor. */
 class PresetManager {
   constructor(
@@ -83,19 +83,26 @@ class PresetManager {
           preset,
         ]),
       );
-      const choice = await this.ctx.ui.select(EXTENSION_NAME, [
+      const menuLabels = [
         NEW_PRESET_LABEL,
         ...entries.keys(),
-        CLEAR_ACTIVE_LABEL,
+        CLEAR_ACTIVE_PRESET_LABEL,
         STATUS_ACTION_LABEL,
         CLOSE_LABEL,
-      ]);
+      ];
+      const choice = resolveManagerAction(
+        await this.ctx.ui.select(
+          EXTENSION_NAME,
+          menuLabels.map((label) => formatManagerAction(label)),
+        ),
+        menuLabels,
+      );
 
       if (choice === undefined || choice === CLOSE_LABEL) return;
 
       if (choice === NEW_PRESET_LABEL) {
         selected = await this.edit("new");
-      } else if (choice === CLEAR_ACTIVE_LABEL) {
+      } else if (choice === CLEAR_ACTIVE_PRESET_LABEL) {
         if (
           await this.ctx.ui.confirm(
             "Clear Active Preset?",
@@ -329,19 +336,23 @@ class PresetManager {
 
     const destination = preset.scope === "user" ? "project" : "user";
     const moveLabel = `Move to ${formatScopeName(destination)}`;
-    const choice = await this.ctx.ui.select(
-      `${JSON.stringify(preset.name)} · ${formatScopeName(preset.scope)}`,
-      [
-        APPLY_LABEL,
-        EDIT_LABEL,
-        DUPLICATE_LABEL,
-        moveLabel,
-        MOVE_UP_LABEL,
-        MOVE_DOWN_LABEL,
-        DETAILS_LABEL,
-        DELETE_LABEL,
-        BACK_LABEL,
-      ],
+    const actionLabels = [
+      APPLY_LABEL,
+      EDIT_LABEL,
+      DUPLICATE_LABEL,
+      moveLabel,
+      MOVE_UP_LABEL,
+      MOVE_DOWN_LABEL,
+      VIEW_DETAILS_LABEL,
+      DELETE_LABEL,
+      BACK_LABEL,
+    ];
+    const choice = resolveManagerAction(
+      await this.ctx.ui.select(
+        `${JSON.stringify(preset.name)} · ${formatScopeName(preset.scope)}`,
+        actionLabels.map((label) => formatManagerAction(label)),
+      ),
+      actionLabels,
     );
 
     if (choice === undefined || choice === BACK_LABEL) return undefined;
@@ -363,7 +374,7 @@ class PresetManager {
       await this.apply(identity);
     } else if (choice === EDIT_LABEL || choice === DUPLICATE_LABEL) {
       return this.edit(choice === EDIT_LABEL ? "edit" : "duplicate", current);
-    } else if (choice === DETAILS_LABEL) {
+    } else if (choice === VIEW_DETAILS_LABEL) {
       await this.ctx.ui.editor(
         `Preset Details (Read Only) · ${formatScopeName(current.scope)}`,
         JSON.stringify(toPersistedPreset(current), null, 2),
