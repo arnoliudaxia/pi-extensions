@@ -8,11 +8,7 @@ import {
   STATUS_LABEL,
   THINKING_LABEL,
 } from "./labels.js";
-import {
-  formatAvailabilityStatus,
-  formatScopeName,
-  formatThinkingLevel,
-} from "./widgets.js";
+import { formatScopeName, formatThinkingLevel } from "./widgets.js";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 
 /** Select an exact loaded preset, or return undefined when the prompt is cancelled. */
@@ -47,18 +43,42 @@ export async function openRpcPicker(
   return selected === undefined ? undefined : options.get(selected);
 }
 
+/** Keep user-controlled values literal when Pi Web renders options as Markdown. */
+function formatMarkdownCode(value: string): string {
+  const singleLine = value.replaceAll(/[\r\n]+/gu, "↵");
+  const longestBacktickRun = Math.max(
+    0,
+    ...(singleLine.match(/`+/gu)?.map((run) => run.length) ?? []),
+  );
+  const delimiter = "`".repeat(longestBacktickRun + 1);
+
+  // Padding prevents a trailing backtick in the value from joining the closer.
+  return `${delimiter} ${singleLine} ${delimiter}`;
+}
+
 function formatOption(preset: LoadedPreset, index: number): string {
-  const status = [
-    formatAvailabilityStatus(preset) || "Available",
-    ...(preset.clampWarning ? ["Thinking will be clamped."] : []),
-    ...(preset.shadowed ? ["Project preset takes precedence by name."] : []),
+  const thinking = [
+    formatThinkingLevel(preset.thinkingLevel ?? "off"),
+    ...(preset.clampWarning ? ["(will be clamped)"] : []),
   ].join(" ");
+  const notes = preset.shadowed ? " · Project wins by name" : "";
 
   return [
-    `${index + 1}. ${JSON.stringify(preset.name)}`,
-    `${SCOPE_LABEL}: ${formatScopeName(preset.scope)}`,
-    `${MODEL_LABEL}: ${preset.provider} / ${preset.model}`,
-    `${THINKING_LABEL}: ${formatThinkingLevel(preset.thinkingLevel ?? "off")}`,
-    `${STATUS_LABEL}: ${status}`,
-  ].join(" · ");
+    `**${index + 1}.** ${formatMarkdownCode(preset.name)}`,
+    `${SCOPE_LABEL}: ${formatScopeName(preset.scope)} · ${MODEL_LABEL}: ${formatMarkdownCode(`${preset.provider} / ${preset.model}`)}`,
+    `${THINKING_LABEL}: ${thinking} · ${STATUS_LABEL}: ${formatPickerStatus(preset)}${notes}`,
+  ].join("  \n");
+}
+
+function formatPickerStatus(preset: LoadedPreset): string {
+  switch (preset.unavailable) {
+    case "no-key":
+      return "Unavailable: provider has no API key";
+    case "no-model":
+      return "Unavailable: model is no longer available";
+    case undefined:
+      return "Available";
+    default:
+      return "Available";
+  }
 }

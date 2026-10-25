@@ -34,7 +34,7 @@ describe("openRpcPicker", () => {
     await expect(openRpcPicker(setup.ctx, [PRESET])).resolves.toBe(PRESET);
 
     expect(setup.select).toHaveBeenCalledExactlyOnceWith("Presets Plus", [
-      '1. "Deep Work" · Scope: User · Model: anthropic / claude · Thinking level: High · Status: Available',
+      "**1.** ` Deep Work `  \nScope: User · Model: ` anthropic / claude `  \nThinking level: High · Status: Available",
     ]);
     expect(setup.custom).not.toHaveBeenCalled();
     expect(setup.notify).not.toHaveBeenCalled();
@@ -57,7 +57,7 @@ describe("openRpcPicker", () => {
 
       expect(new Set(options).size).toBe(2);
       expect(options[0]).toContain("Scope: User");
-      expect(options[0]).toContain("Project preset takes precedence by name.");
+      expect(options[0]).toContain("Project wins by name");
       expect(options[1]).toContain("Scope: Project");
       expect(setup.custom).not.toHaveBeenCalled();
     },
@@ -115,10 +115,24 @@ describe("openRpcPicker", () => {
 
     const options = setup.select.mock.calls[0]?.[1] ?? [];
 
-    expect(options[0]).toContain("no API key configured.");
-    expect(options[0]).toContain("Thinking will be clamped.");
-    expect(options[1]).toContain("model is no longer available.");
+    expect(options[0]).toContain("Unavailable: provider has no API key");
+    expect(options[0]).toContain("Thinking level: High (will be clamped)");
+    expect(options[1]).toContain("Unavailable: model is no longer available");
     expect(options[1]).toContain("Thinking level: Off");
+  });
+
+  it("keeps preset names literal inside Markdown code spans", async () => {
+    const preset = {
+      ...PRESET,
+      name: "[open](https://example.test)\n**bold** `tick`",
+    };
+    const setup = harness();
+
+    await openRpcPicker(setup.ctx, [preset]);
+
+    expect(setup.select.mock.calls[0]?.[1]?.[0]).toBe(
+      "**1.** `` [open](https://example.test)↵**bold** `tick` ``  \nScope: User · Model: ` anthropic / claude `  \nThinking level: High · Status: Available",
+    );
   });
 
   it("offers management even when no presets exist", async () => {
