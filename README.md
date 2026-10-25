@@ -95,6 +95,7 @@ In Pi's terminal interface:
 | Command                       | What it does                                                                                 |
 | ----------------------------- | -------------------------------------------------------------------------------------------- |
 | `/presets`                    | Opens the picker.                                                                            |
+| `/presets manage`             | Opens the preset manager in an interactive client.                                           |
 | `/presets <name>`             | Activates the named preset.                                                                  |
 | `/presets clear`              | Clears the active preset and returns to Pi's defaults.                                       |
 | `/presets reload`             | Re-reads your configuration files after you edit them by hand.                               |
@@ -117,15 +118,53 @@ thinking level, and availability. Choosing an option activates that exact
 preset, including when both scopes contain the same name. Cancelling leaves the
 active preset unchanged.
 
-This selection prompt does not create or edit presets. Use Pi's terminal
-interface or edit the configuration files below to manage them. Reopening
-`/presets` reads the latest configuration. Only trusted Project presets are
-loaded. A preset prohibited by the directory policy still requires your
-confirmation before activation.
+Choose **Manage Presets** at the end of the list, or run `/presets manage`, to
+create, edit, duplicate, delete, move, and reorder presets. The management entry
+remains available when no presets exist. Reopening `/presets` reads the latest
+configuration. Only trusted Project presets are loaded. A preset prohibited by
+the directory policy still requires your confirmation before activation.
 
 The named activation, clear, reload, status, policy, and show-prompt commands
 remain available. Directory defaults and preset hotkeys are not enabled by this
 RPC picker. Print and JSON modes do not open a selection prompt.
+
+### The preset manager
+
+Run `/presets manage` in Pi Web or another interactive client. Select **New
+Preset** to create one, or select an existing preset to apply, edit, duplicate,
+move between User and Project scopes, move up or down within its scope, view its
+details, or delete it. The main menu also provides status and clear actions.
+Deleting a preset requires confirmation; deleting the active preset does not
+clear its session attachment, so Clear can still restore its baseline.
+
+The editor covers the name, scope, provider, model, thinking level, tools,
+prompt, hotkey, and order fields. You can enter provider and model identifiers
+manually, including before credentials or the model are available. The tools
+editor preserves unknown tool names. An omitted or empty tools list inherits the
+session tools; it does not disable every tool. The file's array order, changed
+by Move Up and Move Down, determines display order; the optional `order` field
+is preserved but does not sort the list.
+
+- **Save** writes the preset without switching the model or tools.
+- **Save And Apply** writes first, then applies the saved preset through the
+  usual availability and policy checks. A failed or cancelled activation does
+  not undo the save.
+- Cancelling a field leaves its value unchanged. Leaving a modified draft asks
+  before discarding it. Saving errors keep the draft available for correction.
+
+The manager preserves fields you do not edit, including prompt whitespace,
+explicit `off`, empty tools arrays, and `order: 0`. Renaming or moving the
+active preset keeps its session attachment and baseline. Saving its prompt
+changes the instructions used on subsequent turns, even without reapplying.
+Hotkey changes are saved for terminal use and require Pi's `/reload`; this does
+not add browser hotkey handling. The manager uses Save And Apply rather than an
+unsaved draft Test.
+
+Project writes require trust at commit time. Unsafe configuration files are not
+overwritten. If the selected preset changes while a dialog is open, the manager
+rejects the stale write and asks you to reopen it. RPC mutations are serialized
+within the process; this is not a cross-process file lock, so avoid simultaneous
+edits from separate Pi processes.
 
 ### The picker
 

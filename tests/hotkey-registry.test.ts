@@ -208,6 +208,35 @@ describe("HotkeyRegistry reload decisions", () => {
 });
 
 describe("HotkeyRegistry.changedHotkeyNames", () => {
+  it("detects a different effective owner after reordering unchanged hotkeys", () => {
+    const registry = new HotkeyRegistry();
+    const plan = preset("plan", "ctrl+1");
+    const review = preset("review", "ctrl+1");
+    const { shortcuts } = bind(registry, [plan, review]);
+
+    expect(registry.changedHotkeyNames([review, plan])).toEqual([
+      "review",
+      "plan",
+    ]);
+
+    expect(shortcutDescriptions(shortcuts)).toEqual([
+      ["ctrl+1", 'Activate preset "plan"'],
+    ]);
+    expect(registry.changedHotkeyNames([plan, review])).toEqual([]);
+  });
+
+  it("detects effective binding changes caused by name shadowing", () => {
+    const registry = new HotkeyRegistry();
+    const user = preset("plan", "ctrl+1");
+    const project = preset("plan", undefined, "project");
+
+    bind(registry, [user]);
+
+    expect(
+      registry.changedHotkeyNames([{ ...user, shadowed: true }, project]),
+    ).toEqual(["plan"]);
+  });
+
   it("returns nothing when the file matches the bound hotkeys", () => {
     const registry = new HotkeyRegistry();
 

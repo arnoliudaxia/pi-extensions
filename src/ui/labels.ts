@@ -42,6 +42,7 @@ export const ACTIVATE_LABEL = "Activate";
 export const FILTER_LABEL = "Filter";
 export const STATUS_ACTION_LABEL = "Status";
 export const NEW_LABEL = "New";
+export const MANAGE_PRESETS_LABEL = "Manage Presets";
 export const EDIT_LABEL = "Edit";
 export const DUPLICATE_LABEL = "Duplicate";
 export const DELETE_LABEL = "Delete";

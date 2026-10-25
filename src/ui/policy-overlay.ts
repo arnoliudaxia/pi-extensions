@@ -20,10 +20,11 @@ const POLICY_OVERRIDE_TITLE = "Preset Doesn't Match Policy";
 export async function openPolicyOverride(
   ctx: Pick<ExtensionContext, "mode" | "ui">,
   preset: Pick<LoadedPreset, "name">,
+  options?: { readonly standard?: boolean },
 ): Promise<boolean> {
   const message = `The access policy for this directory does not permit preset "${preset.name}". Activate it anyway?`;
 
-  if (!isInteractiveTui(ctx)) {
+  if (options?.standard || !isInteractiveTui(ctx)) {
     return ctx.ui.confirm(POLICY_OVERRIDE_TITLE, message);
   }
 

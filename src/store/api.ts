@@ -2,6 +2,8 @@
  * Loads and mutates consolidated configuration across both scopes.
  * Every operation reads current files again so reloads and direct edits take effect.
  */
+import { isDeepStrictEqual } from "node:util";
+
 import { EXTENSION_NAME } from "../extension-name.js";
 import { analyzeHotkeys } from "../hotkey-rules.js";
 import type {
@@ -11,7 +13,12 @@ import type {
   ScopeConfig,
 } from "../types.js";
 import { formatScopeName } from "../ui/widgets.js";
-import { DEFAULT_CONFIG, parseScope, PRESETS_PLUS_CONFIG } from "./config.js";
+import {
+  CONFIG_VERSION,
+  DEFAULT_CONFIG,
+  parseScope,
+  PRESETS_PLUS_CONFIG,
+} from "./config.js";
 import { mergeScopes } from "./merge.js";
 import type { PolicyRules } from "./policy.js";
 import { computeClampWarning } from "./validate.js";
@@ -40,11 +47,17 @@ export interface PresetsConfig {
 }
 /** Result type for mutating operations. */
 export type SaveResult = { ok: true } | { ok: false; reason: string };
+/** A synchronous precondition checked against each affected scope's fresh read. */
+export type ScopePrecondition = (
+  scope: PresetScope,
+  loaded: ScopeConfig,
+) => void;
 /** Subset of context needed by storage operations. */
-type StorageContext = Pick<
+export type StorageContext = Pick<
   ExtensionContext,
   "cwd" | "isProjectTrusted" | "modelRegistry"
 >;
+
 /** Test seam for move writes. */
 type WriteScope = (
   scope: PresetScope,
@@ -52,11 +65,23 @@ type WriteScope = (
   ctx: StorageContext,
 ) => Promise<void>;
 
+/** A refused write, distinct from an unexpected filesystem failure. */
+export class StorageWriteError extends Error {
+  constructor(
+    readonly code: "conflict" | "unsafe",
+    reason: string,
+  ) {
+    super(reason);
+    this.name = "StorageWriteError";
+  }
+}
+
 /** Append a preset to a safe scope. */
 export async function addPreset(
   preset: Preset,
   scope: PresetScope,
   ctx: StorageContext,
+  check?: ScopePrecondition,
 ): Promise<SaveResult> {
   const loaded = await readScope(scope, ctx);
 
@@ -69,7 +94,8 @@ export async function addPreset(
     };
   }
 
-  await writeDocument(scope, [...loaded.presets, preset], ctx);
+  check?.(scope, loaded);
+  await writeDocument(scope, [...loaded.presets, preset], ctx, loaded);
 
   return { ok: true };
 }
@@ -118,7 +144,8 @@ export async function movePreset(
   destinationScope: PresetScope,
   nextPreset: Preset,
   ctx: StorageContext,
-  writeScope: WriteScope = saveScope,
+  writeScope?: WriteScope,
+  check?: ScopePrecondition,
 ): Promise<SaveResult> {
   if (sourceScope === destinationScope)
     return {
@@ -151,17 +178,42 @@ export async function movePreset(
     };
   }
 
+  check?.(sourceScope, source);
+  check?.(destinationScope, destination);
+
   const nextSource = source.presets.filter(
     (_preset, index) => index !== sourceIndex,
   );
 
-  await writeScope(destinationScope, [...destination.presets, nextPreset], ctx);
+  const nextDestination = [...destination.presets, nextPreset];
+  const write: WriteScope =
+    writeScope ??
+    ((scope, presets, context) =>
+      writeDocument(
+        scope,
+        presets,
+        context,
+        scope === sourceScope ? source : destination,
+      ));
+
+  await write(destinationScope, nextDestination, ctx);
 
   try {
-    await writeScope(sourceScope, nextSource, ctx);
+    await write(sourceScope, nextSource, ctx);
   } catch (sourceError) {
     try {
-      await writeScope(destinationScope, destination.presets, ctx);
+      if (writeScope) {
+        await writeScope(destinationScope, destination.presets, ctx);
+      } else {
+        await writeDocument(destinationScope, destination.presets, ctx, {
+          ...destination,
+          document: {
+            ...destination.document,
+            version: CONFIG_VERSION,
+            presets: nextDestination.map(toPersistedPreset),
+          },
+        });
+      }
     } catch (rollbackError) {
       throw new AggregateError(
         [sourceError, rollbackError],
@@ -176,20 +228,56 @@ export async function movePreset(
   return { ok: true };
 }
 
+/**
+ * Read one scope's file once for a mutation, or refuse when the project is
+ * not trusted or the file did not load completely.
+ */
+export async function readScope(
+  scope: PresetScope,
+  ctx: StorageContext,
+): Promise<ScopeConfig | { ok: false; reason: string }> {
+  const path = PRESETS_PLUS_CONFIG.path(ctx, scope);
+
+  if (scope === "project" && !ctx.isProjectTrusted()) {
+    return {
+      ok: false,
+      reason: `The project is not trusted, so ${path} was not saved. Trust the project and try again.`,
+    };
+  }
+
+  const result = parseScope(scope, await PRESETS_PLUS_CONFIG.read(ctx, scope));
+  const { file, policy, presets } = result.warnings;
+
+  if (
+    file.length + presets.length + policy.length > 0 ||
+    result.invalidShowInactiveStatus !== undefined
+  ) {
+    return {
+      ok: false,
+      reason: `${EXTENSION_NAME} did not change the ${scope} configuration file at ${path}. It could not load the complete file. Fix the file and try again.`,
+    };
+  }
+
+  return result;
+}
+
 /** Remove a preset by name, treating an absent name as a no-op. */
 export async function removePreset(
   name: string,
   scope: PresetScope,
   ctx: StorageContext,
+  check?: ScopePrecondition,
 ): Promise<SaveResult> {
   const loaded = await readScope(scope, ctx);
 
   if ("ok" in loaded) return loaded;
 
+  check?.(scope, loaded);
+
   const next = loaded.presets.filter((preset) => preset.name !== name);
 
   if (next.length !== loaded.presets.length)
-    await writeDocument(scope, next, ctx);
+    await writeDocument(scope, next, ctx, loaded);
 
   return { ok: true };
 }
@@ -199,10 +287,13 @@ export async function reorderWithinScope(
   scope: PresetScope,
   orderedNames: readonly string[],
   ctx: StorageContext,
+  check?: ScopePrecondition,
 ): Promise<SaveResult> {
   const loaded = await readScope(scope, ctx);
 
   if ("ok" in loaded) return loaded;
+
+  check?.(scope, loaded);
 
   const byName = new Map(
     loaded.presets.map((preset) => [preset.name, preset] as const),
@@ -221,7 +312,7 @@ export async function reorderWithinScope(
 
   for (const preset of loaded.presets)
     if (!seen.has(preset.name)) next.push(preset);
-  await writeDocument(scope, next, ctx);
+  await writeDocument(scope, next, ctx, loaded);
 
   return { ok: true };
 }
@@ -232,7 +323,11 @@ export async function saveScope(
   presets: readonly Preset[],
   ctx: StorageContext,
 ): Promise<void> {
-  await writeDocument(scope, presets, ctx);
+  const loaded = await readScope(scope, ctx);
+
+  if ("ok" in loaded) throw new StorageWriteError("unsafe", loaded.reason);
+
+  await writeDocument(scope, presets, ctx, loaded);
 }
 
 /** Project a preset onto its persisted fields. */
@@ -260,10 +355,13 @@ export async function updatePreset(
   scope: PresetScope,
   nextPreset: Preset,
   ctx: StorageContext,
+  check?: ScopePrecondition,
 ): Promise<SaveResult> {
   const loaded = await readScope(scope, ctx);
 
   if ("ok" in loaded) return loaded;
+
+  check?.(scope, loaded);
 
   const index = loaded.presets.findIndex((preset) => preset.name === oldName);
 
@@ -288,42 +386,9 @@ export async function updatePreset(
   const next = [...loaded.presets];
 
   next[index] = nextPreset;
-  await writeDocument(scope, next, ctx);
+  await writeDocument(scope, next, ctx, loaded);
 
   return { ok: true };
-}
-
-/**
- * Read one scope's file once for a mutation, or refuse when the project is
- * not trusted or the file did not load completely.
- */
-async function readScope(
-  scope: PresetScope,
-  ctx: StorageContext,
-): Promise<ScopeConfig | { ok: false; reason: string }> {
-  const path = PRESETS_PLUS_CONFIG.path(ctx, scope);
-
-  if (scope === "project" && !ctx.isProjectTrusted()) {
-    return {
-      ok: false,
-      reason: `The project is not trusted, so ${path} was not saved. Trust the project and try again.`,
-    };
-  }
-
-  const result = parseScope(scope, await PRESETS_PLUS_CONFIG.read(ctx, scope));
-  const { file, policy, presets } = result.warnings;
-
-  if (
-    file.length + presets.length + policy.length > 0 ||
-    result.invalidShowInactiveStatus !== undefined
-  ) {
-    return {
-      ok: false,
-      reason: `${EXTENSION_NAME} did not change the ${scope} configuration file at ${path}. It could not load the complete file. Fix the file and try again.`,
-    };
-  }
-
-  return result;
 }
 
 /**
@@ -360,9 +425,44 @@ async function writeDocument(
   scope: PresetScope,
   presets: readonly Preset[],
   ctx: StorageContext,
+  expected: ScopeConfig,
 ): Promise<void> {
-  await PRESETS_PLUS_CONFIG.update(ctx, scope, (data) => ({
-    ...data,
-    presets: presets.map(toPersistedPreset),
-  }));
+  await PRESETS_PLUS_CONFIG.update(ctx, scope, (data) => {
+    if (scope === "project" && !ctx.isProjectTrusted()) {
+      throw new StorageWriteError(
+        "unsafe",
+        "The project is no longer trusted. Trust the project and try again.",
+      );
+    }
+
+    const current = parseScope(scope, {
+      state: "loaded",
+      scope,
+      path: PRESETS_PLUS_CONFIG.path(ctx, scope),
+      data,
+      renamedKeys: [],
+    });
+
+    if (
+      current.invalidShowInactiveStatus !== undefined ||
+      current.warnings.file.length +
+        current.warnings.presets.length +
+        current.warnings.policy.length >
+        0
+    ) {
+      throw new StorageWriteError(
+        "unsafe",
+        "The configuration could not be loaded completely. Fix the file and try again.",
+      );
+    }
+
+    if (!isDeepStrictEqual(data, expected.document)) {
+      throw new StorageWriteError(
+        "conflict",
+        "The configuration changed before it could be saved. Reload and try again.",
+      );
+    }
+
+    return { ...data, presets: presets.map(toPersistedPreset) };
+  });
 }

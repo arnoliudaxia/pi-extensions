@@ -7,7 +7,7 @@ import { activate } from "./activation/activate.js";
 import type { ActivePresetSession } from "./activation/session.js";
 import { EXTENSION_NAME } from "./extension-name.js";
 import { analyzeHotkeys, hotkeyChanged } from "./hotkey-rules.js";
-import type { PresetIdentity } from "./preset-identity.js";
+import { samePresetIdentity, type PresetIdentity } from "./preset-identity.js";
 import type { LoadedPreset } from "./types.js";
 import { reportWarnings } from "./warnings.js";
 import type {
@@ -22,6 +22,8 @@ import { describeErrorSentence } from "@sherif-fanous/pi-extensions-core";
  * changes the user already declined to reload for.
  */
 export class HotkeyRegistry {
+  /** Effective owners, not just declarations, can change when presets reorder. */
+  private readonly runtimeBindings = new Map<string, PresetIdentity>();
   private readonly acknowledgedPendingHotkeys = new Map<
     string,
     string | undefined
@@ -90,6 +92,23 @@ export class HotkeyRegistry {
       if (!current.has(key) && hotkeyChanged(runtime.hotkey, undefined)) {
         names.add(runtime.name);
       }
+    }
+
+    const bindings = new Map(
+      analyzeHotkeys(presets).bindings.map((binding) => [binding.key, binding]),
+    );
+
+    for (const [key, current] of bindings) {
+      const previous = this.runtimeBindings.get(key);
+
+      if (!samePresetIdentity(previous, current)) {
+        names.add(current.name);
+        if (previous) names.add(previous.name);
+      }
+    }
+
+    for (const [key, previous] of this.runtimeBindings) {
+      if (!bindings.has(key)) names.add(previous.name);
     }
 
     return [...names];
@@ -168,6 +187,14 @@ export class HotkeyRegistry {
   private setRuntimeHotkeyBaseline(presets: readonly LoadedPreset[]): void {
     this.acknowledgedPendingHotkeys.clear();
     this.runtimeHotkeys.clear();
+    this.runtimeBindings.clear();
+
+    for (const binding of analyzeHotkeys(presets).bindings) {
+      this.runtimeBindings.set(binding.key, {
+        name: binding.name,
+        scope: binding.scope,
+      });
+    }
 
     for (const preset of presets) {
       this.runtimeHotkeys.set(presetKey(preset), {

@@ -52,6 +52,8 @@ export type ActivationRequest = {
    * when absent.
    */
   readonly config?: PresetsConfig;
+  /** Keep a standard-dialog management flow out of custom terminal overlays. */
+  readonly policyUi?: "standard";
   readonly trigger: ActivationTrigger;
 } & (
   | { readonly preset: LoadedPreset }
@@ -98,7 +100,7 @@ export async function activate(
     return { kind: "unknown", warnings };
   }
 
-  if (!(await passesPolicy(preset, config.policy, ctx))) {
+  if (!(await passesPolicy(preset, config.policy, ctx, request.policyUi))) {
     return { kind: "cancelled", warnings };
   }
 
@@ -249,6 +251,7 @@ async function passesPolicy(
   preset: LoadedPreset,
   policy: PolicyRules,
   ctx: Pick<ExtensionContext, "cwd" | "mode" | "ui">,
+  policyUi?: "standard",
 ): Promise<boolean> {
   if (isPermitted(preset, resolveMatchingRules(ctx.cwd, policy.rules))) {
     return true;
@@ -256,7 +259,7 @@ async function passesPolicy(
 
   const { openPolicyOverride } = await import("../ui/policy-overlay.js");
 
-  return openPolicyOverride(ctx, preset);
+  return openPolicyOverride(ctx, preset, { standard: policyUi === "standard" });
 }
 
 /**

@@ -2,6 +2,7 @@
 import { EXTENSION_NAME } from "../extension-name.js";
 import type { LoadedPreset } from "../types.js";
 import {
+  MANAGE_PRESETS_LABEL,
   MODEL_LABEL,
   SCOPE_LABEL,
   STATUS_LABEL,
@@ -18,8 +19,9 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 export async function openRpcPicker(
   ctx: Pick<ExtensionContext, "ui">,
   presets: readonly LoadedPreset[],
+  onManage?: () => Promise<void>,
 ): Promise<LoadedPreset | undefined> {
-  if (presets.length === 0) {
+  if (presets.length === 0 && !onManage) {
     ctx.ui.notify(
       "No presets loaded. Add one to your configuration and try again.",
       "info",
@@ -31,7 +33,16 @@ export async function openRpcPicker(
   const options = new Map(
     presets.map((preset, index) => [formatOption(preset, index), preset]),
   );
-  const selected = await ctx.ui.select(EXTENSION_NAME, [...options.keys()]);
+  const selected = await ctx.ui.select(EXTENSION_NAME, [
+    ...options.keys(),
+    ...(onManage ? [MANAGE_PRESETS_LABEL] : []),
+  ]);
+
+  if (onManage && selected === MANAGE_PRESETS_LABEL) {
+    await onManage();
+
+    return undefined;
+  }
 
   return selected === undefined ? undefined : options.get(selected);
 }

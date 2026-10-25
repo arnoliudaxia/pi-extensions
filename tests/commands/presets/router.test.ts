@@ -75,6 +75,7 @@ describe("getArgumentCompletions", () => {
 
     expect(result.map((completion) => completion.value).sort()).toEqual([
       "clear",
+      "manage",
       "policy",
       "reload",
       "show-prompt",
@@ -261,7 +262,7 @@ describe("runPresetsCommand", () => {
       });
 
       expect(notify).toHaveBeenCalledExactlyOnceWith(
-        `Presets Plus: 1 warning\n- Unknown subcommand "${argument}". Try /presets, /presets reload, /presets clear, /presets status, /presets policy, or /presets show-prompt.`,
+        `Presets Plus: 1 warning\n- Unknown subcommand "${argument}". Try /presets, /presets reload, /presets clear, /presets status, /presets policy, /presets show-prompt, or /presets manage.`,
         "warning",
       );
       expect(openPickerMock).not.toHaveBeenCalled();

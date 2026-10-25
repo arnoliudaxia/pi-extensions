@@ -11,6 +11,7 @@ import { loadPresetsConfig } from "../../store/api.js";
 import { openPicker } from "../../ui/picker.js";
 import { openRpcPicker } from "../../ui/rpc-picker.js";
 import { runClear } from "./clear.js";
+import { runPresetManager } from "./manage.js";
 import { runPolicy } from "./policy.js";
 import { runReload } from "./reload.js";
 import { runShowPrompt } from "./show-prompt.js";
@@ -25,6 +26,9 @@ import {
   requireInteractiveTui,
   subcommandCompletions,
 } from "@sherif-fanous/pi-extensions-core";
+
+/** Sessions with an open manager must finish or cancel it before opening another. */
+const ACTIVE_MANAGERS = new WeakSet<ActivePresetSession>();
 
 /** What `/presets` and its subcommands need besides arguments and context. */
 export interface PresetsCommandDeps {
@@ -76,6 +80,11 @@ const SUBCOMMANDS: readonly Subcommand[] = [
     acceptsName: true,
     description: "Show a preset's prompt, the active one by default",
     run: (ctx, args, { session }) => runShowPrompt(ctx, args, session),
+  },
+  {
+    name: "manage",
+    description: "Manage presets",
+    run: (ctx, _args, deps) => runManage(ctx, deps),
   },
 ] as const;
 
@@ -163,13 +172,43 @@ export async function runPresetsCommand(
   notifyUsageWarning(ctx, EXTENSION_NAME, trimmedArgs, USAGE_FORMS);
 }
 
+async function runManage(
+  ctx: ExtensionCommandContext,
+  deps: PresetsCommandDeps,
+): Promise<void> {
+  if (!ctx.hasUI || (ctx.mode !== "tui" && ctx.mode !== "rpc")) {
+    ctx.ui.notify("Preset management needs an interactive client.", "warning");
+
+    return;
+  }
+
+  if (ACTIVE_MANAGERS.has(deps.session)) {
+    ctx.ui.notify(
+      "A preset manager is already open in this session.",
+      "warning",
+    );
+
+    return;
+  }
+
+  ACTIVE_MANAGERS.add(deps.session);
+
+  try {
+    await runPresetManager(ctx, deps);
+  } finally {
+    ACTIVE_MANAGERS.delete(deps.session);
+  }
+}
+
 async function runPicker(
   ctx: ExtensionCommandContext,
   { hotkeys, pi, session }: PresetsCommandDeps,
 ): Promise<void> {
   if (ctx.mode === "rpc" && ctx.hasUI) {
     const loaded = await loadPresetsConfig(ctx);
-    const preset = await openRpcPicker(ctx, loaded.presets);
+    const preset = await openRpcPicker(ctx, loaded.presets, () =>
+      runManage(ctx, { hotkeys, pi, session }),
+    );
 
     if (!preset) return;
 

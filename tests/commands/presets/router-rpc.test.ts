@@ -166,17 +166,16 @@ describe("RPC picker routing", () => {
     expect(setup.session.current()).toBeUndefined();
   });
 
-  it("notifies an empty store without selection or activation", async () => {
-    const setup = harness(0);
+  it("offers management in an empty store without activating on cancellation", async () => {
+    const setup = harness();
     const activate = vi.spyOn(activation, "activate");
 
     await runPresetsCommand("", setup.ctx, setup.deps);
 
-    expect(setup.notify).toHaveBeenCalledExactlyOnceWith(
-      "No presets loaded. Add one to your configuration and try again.",
-      "info",
-    );
-    expect(setup.select).not.toHaveBeenCalled();
+    expect(setup.notify).not.toHaveBeenCalled();
+    expect(setup.select).toHaveBeenCalledExactlyOnceWith("Presets Plus", [
+      "Manage Presets",
+    ]);
     expect(activate).not.toHaveBeenCalled();
     expect(setup.custom).not.toHaveBeenCalled();
   });

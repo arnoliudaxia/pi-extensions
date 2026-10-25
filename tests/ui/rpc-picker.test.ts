@@ -121,6 +121,35 @@ describe("openRpcPicker", () => {
     expect(options[1]).toContain("Thinking level: Off");
   });
 
+  it("offers management even when no presets exist", async () => {
+    const setup = harness("Manage Presets");
+    const onManage = vi.fn(() => Promise.resolve());
+
+    await expect(
+      openRpcPicker(setup.ctx, [], onManage),
+    ).resolves.toBeUndefined();
+
+    expect(setup.select).toHaveBeenCalledExactlyOnceWith("Presets Plus", [
+      "Manage Presets",
+    ]);
+    expect(onManage).toHaveBeenCalledTimes(1);
+    expect(setup.notify).not.toHaveBeenCalled();
+    expect(setup.custom).not.toHaveBeenCalled();
+  });
+
+  it("does not confuse a preset named Manage Presets with the action", async () => {
+    const preset = { ...PRESET, name: "Manage Presets" };
+    const setup = harness(0);
+    const onManage = vi.fn(() => Promise.resolve());
+
+    await expect(openRpcPicker(setup.ctx, [preset], onManage)).resolves.toBe(
+      preset,
+    );
+
+    expect(onManage).not.toHaveBeenCalled();
+    expect(setup.select.mock.calls[0]?.[1]).toHaveLength(2);
+  });
+
   it("follows the shown-text standard for selection and empty state", async () => {
     const recorder = createShownTextRecorder();
     const ctx = createFakeContext({
