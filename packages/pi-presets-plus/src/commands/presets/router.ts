@@ -7,7 +7,9 @@ import { activate } from "../../activation/activate.js";
 import type { ActivePresetSession } from "../../activation/session.js";
 import { EXTENSION_NAME } from "../../extension-name.js";
 import type { HotkeyRegistry } from "../../hotkey-registry.js";
+import { loadPresetsConfig } from "../../store/api.js";
 import { openPicker } from "../../ui/picker.js";
+import { openRpcPicker } from "../../ui/rpc-picker.js";
 import { runClear } from "./clear.js";
 import { runPolicy } from "./policy.js";
 import { runReload } from "./reload.js";
@@ -165,8 +167,25 @@ async function runPicker(
   ctx: ExtensionCommandContext,
   { hotkeys, pi, session }: PresetsCommandDeps,
 ): Promise<void> {
-  // Outside the TUI, ui.custom resolves undefined and no picker can open.
-  // The preset editor opens only from the picker, so this gates it too.
+  if (ctx.mode === "rpc" && ctx.hasUI) {
+    const loaded = await loadPresetsConfig(ctx);
+    const preset = await openRpcPicker(ctx, loaded.presets);
+
+    if (!preset) return;
+
+    const outcome = await activate(ctx, pi, session, {
+      preset,
+      trigger: "picker",
+      config: loaded,
+    });
+
+    if (outcome.kind === "refused") {
+      ctx.ui.notify(outcome.reason, "error");
+    }
+
+    return;
+  }
+
   if (!requireInteractiveTui(ctx, EXTENSION_NAME, "/presets")) return;
 
   await openPicker(ctx, {

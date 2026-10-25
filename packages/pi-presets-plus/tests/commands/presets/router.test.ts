@@ -1,6 +1,6 @@
 /**
- * Covers the `/presets` router: argument completion, the interactive-TUI
- * gate for the bare picker, unknown and unsupported subcommands, and
+ * Covers the `/presets` router: argument completion, the mode gate for
+ * the bare picker, unknown and unsupported subcommands, and
  * dispatch to each subcommand handler over a stubbed `ctx`.
  */
 import { mkdir, writeFile } from "node:fs/promises";
@@ -22,7 +22,10 @@ import {
 } from "@sherif-fanous/pi-extensions-testing";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const { openPickerMock } = vi.hoisted(() => ({ openPickerMock: vi.fn() }));
+const { openPickerMock } = vi.hoisted(() => ({
+  openPickerMock:
+    vi.fn<typeof import("../../../src/ui/picker.js").openPicker>(),
+}));
 
 vi.mock("../../../src/ui/picker.js", () => ({ openPicker: openPickerMock }));
 
@@ -188,10 +191,20 @@ describe("getArgumentCompletions", () => {
 });
 
 describe("runPresetsCommand", () => {
-  it.each(["rpc", "json", "print"] as const)(
-    "warns instead of opening the bare picker in %s mode",
-    async (mode) => {
+  it.each([
+    ["rpc", false],
+    ["json", false],
+    ["print", false],
+    ["json", true],
+    ["print", true],
+  ] as const)(
+    "warns instead of opening the bare picker in %s mode with hasUI %j",
+    async (mode, hasUI) => {
       const { ctx, notify } = makeStubCtx(mode);
+      const select = vi.spyOn(ctx.ui, "select");
+      const custom = vi.spyOn(ctx.ui, "custom");
+
+      Object.assign(ctx, { hasUI });
 
       await runPresetsCommand("", ctx, {
         hotkeys: new HotkeyRegistry(),
@@ -204,8 +217,32 @@ describe("runPresetsCommand", () => {
         "warning",
       );
       expect(openPickerMock).not.toHaveBeenCalled();
+      expect(select).not.toHaveBeenCalled();
+      expect(custom).not.toHaveBeenCalled();
     },
   );
+
+  it("keeps the existing TUI picker", async () => {
+    const { ctx } = makeStubCtx();
+    const select = vi.spyOn(ctx.ui, "select");
+    const pi = makeStubPi();
+    const session = new ActivePresetSession();
+    const hotkeys = new HotkeyRegistry();
+
+    await runPresetsCommand("", ctx, { hotkeys, pi, session });
+
+    expect(openPickerMock).toHaveBeenCalledTimes(1);
+
+    const [pickerCtx, options] = openPickerMock.mock.calls[0] ?? [];
+
+    expect(pickerCtx).toBe(ctx);
+    expect(options?.hotkeys).toBe(hotkeys);
+    expect(options?.inheritedTools).toEqual([]);
+    expect(typeof options?.onActivate).toBe("function");
+    expect(options?.pi).toBe(pi);
+    expect(options?.session).toBe(session);
+    expect(select).not.toHaveBeenCalled();
+  });
 
   it.each([
     ["bogus", "bogus"],

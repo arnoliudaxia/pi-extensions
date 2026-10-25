@@ -39,7 +39,9 @@ pi remove npm:@sherif-fanous/pi-presets-plus
 
 ## Usage
 
-1. Run `/presets` in any Pi session to open the preset picker.
+In Pi's terminal interface:
+
+1. Run `/presets` to open the preset picker.
 2. Press `n` to create a new preset, or `e` to edit an existing one.
 3. Press `Enter` on the Prompt row to open the multi-line prompt editor, or
    press `F1` on any row to get help for that row.
@@ -65,11 +67,30 @@ Start Pi with `--preset <name>` to activate a preset at startup:
 pi --preset plan
 ```
 
+### RPC clients and Pi Web
+
+In [Pi Web](https://github.com/agegr/pi-web) or another RPC client that supports
+selection prompts, run `/presets` to browse and activate existing presets. Each
+option shows the preset's name, User or Project scope, provider and model,
+thinking level, and availability. Choosing an option activates that exact
+preset, including when both scopes contain the same name. Cancelling leaves the
+active preset unchanged.
+
+This selection prompt does not create or edit presets. Use Pi's terminal
+interface or edit the configuration files below to manage them. Reopening
+`/presets` reads the latest configuration. Only trusted Project presets are
+loaded. A preset prohibited by the directory policy still requires your
+confirmation before activation.
+
+The named activation, clear, reload, status, policy, and show-prompt commands
+remain available. Directory defaults and preset hotkeys are not enabled by this
+RPC picker. Print and JSON modes do not open a selection prompt.
+
 ### The picker
 
-The picker lists your presets and activates the one you choose. It can also
-filter by name, switch scopes, reorder presets, make copies, and delete them.
-Its footer lists the keys that work at that moment.
+In Pi's terminal interface, the picker lists your presets and activates the one
+you choose. It can also filter by name, switch scopes, reorder presets, make
+copies, and delete them. Its footer lists the keys that work at that moment.
 
 | Key                 | Action                              |
 | :------------------ | :---------------------------------- |
