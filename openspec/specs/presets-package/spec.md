@@ -287,7 +287,7 @@ The class SHALL own:
    — the class encapsulates the channel name, the payload version, and the
    null-clear marker so no other module references them.
 5. The status-badge refresh: the class is the single writer of
-   `ctx.ui.setStatus("presets-plus", …)` in the codebase.
+   `ctx.ui.setStatus("command:/presets", …)` in the codebase.
 6. The dirty / clean transitions (`markDirty`, `markClean`).
 7. Session-restore reconstruction from a session branch: a method
    `restoreFromBranch(branch, presets)` SHALL return
@@ -320,7 +320,7 @@ The modules `src/activation/active-state.ts`, `src/activation/dirty.ts`,
 - **AND** no file outside `src/activation/session.ts` SHALL call
   `pi.appendEntry("presets-plus:active", …)`
 - **AND** no file outside `src/activation/session.ts` SHALL call
-  `ctx.ui.setStatus("presets-plus", …)`
+  `ctx.ui.setStatus("command:/presets", …)`
 
 #### Scenario: Apply and clear go through the session class
 
@@ -357,7 +357,9 @@ The modules `src/activation/active-state.ts`, `src/activation/dirty.ts`,
 
 `src/ui/status.ts` SHALL export only:
 
-1. The `STATUS_KEY` constant `"presets-plus"`.
+1. The `STATUS_KEY` constant `"command:/presets"`. Pi Web renders this command
+   status as a button that sends `/presets`; Pi's TUI renders the same value as
+   ordinary status text.
 2. A pure function `renderStatusBadge(active, theme): string` that takes only
    the `ActivePresetState | undefined` value (and a `Theme | undefined` for
    color application) and returns the rendered badge string.

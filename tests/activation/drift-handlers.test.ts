@@ -10,6 +10,7 @@ import {
   syncDirtyFromCurrentState,
 } from "../../src/activation/drift-handlers.js";
 import type { LoadedPreset } from "../../src/types.js";
+import { STATUS_KEY } from "../../src/ui/status.js";
 import { makePiHarness, type PiHarness } from "../helpers/pi-state.js";
 import { describe, expect, it } from "vitest";
 
@@ -70,7 +71,7 @@ describe("handleModelSelectDrift", () => {
     );
 
     expect(harness.session.current()).toMatchObject({ dirty: true });
-    expect(harness.status["presets-plus"]).toBe("Preset: plan!");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan!");
   });
 
   it("ignores restore model_select events", async () => {
@@ -144,6 +145,6 @@ describe("syncDirtyFromCurrentState", () => {
     syncDirtyFromCurrentState(harness.ctx, harness.pi, harness.session);
 
     expect(harness.session.current()).toMatchObject({ dirty: false });
-    expect(harness.status["presets-plus"]).toBe("Preset: plan");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan");
   });
 });

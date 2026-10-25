@@ -184,8 +184,8 @@ export function createShownTextRecorder({
  * period, and be at most 60 characters; every completion must have one.
  * A report's heading must be `<Display Name> <Thing>` in Title Case, and
  * each label before its `Warnings:` line must be in sentence case. The
- * footer status key must be the bare slug and every other key
- * `<slug>:<thing>`.
+ * footer status key must be the bare slug or the command form
+ * `command:/<command>`, and every other key `<slug>:<thing>`.
  */
 export function findShownTextViolations(
   recorder: Pick<ShownTextRecorder, "completions" | "keys" | "texts">,
@@ -252,7 +252,9 @@ function keyProblem(
   slug: string,
 ): string | undefined {
   if (kind === "status") {
-    return key === slug ? undefined : `is not the bare slug ${slug}`;
+    return key === slug || /^command:\/\S+/u.test(key)
+      ? undefined
+      : `is not the bare slug or command key for ${slug}`;
   }
 
   const [namespace, thing, ...rest] = key.split(":");

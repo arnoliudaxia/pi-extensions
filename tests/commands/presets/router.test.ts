@@ -12,6 +12,7 @@ import {
   runPresetsCommand,
 } from "../../../src/commands/presets/router.js";
 import { HotkeyRegistry } from "../../../src/hotkey-registry.js";
+import { STATUS_KEY } from "../../../src/ui/status.js";
 import {
   createFakeContext,
   createFakePi,
@@ -462,7 +463,7 @@ describe("runPresetsCommand", () => {
     });
 
     expect(setStatus).toHaveBeenLastCalledWith(
-      "presets-plus",
+      STATUS_KEY,
       expect.stringContaining("none"),
     );
     expect(session.current()).toBeUndefined();

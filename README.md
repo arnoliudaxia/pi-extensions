@@ -112,11 +112,13 @@ pi --preset plan
 ### RPC clients and Pi Web
 
 In [Pi Web](https://github.com/agegr/pi-web) or another RPC client that supports
-selection prompts, run `/presets` to browse and activate existing presets. Each
-option shows the preset's name, User or Project scope, provider and model,
-thinking level, and availability. Choosing an option activates that exact
-preset, including when both scopes contain the same name. Cancelling leaves the
-active preset unchanged.
+selection prompts, run `/presets` to browse and activate existing presets. In Pi
+Web, the active-preset status badge is also a button that sends `/presets`; in
+Pi's terminal interface it remains ordinary status text. Each option shows the
+preset's name, User or Project scope, provider and model, thinking level, and
+availability. Choosing an option activates that exact preset, including when
+both scopes contain the same name. Cancelling leaves the active preset
+unchanged.
 
 Choose **Manage Presets** at the end of the list, or run `/presets manage`, to
 create, edit, duplicate, delete, move, and reorder presets. The management entry

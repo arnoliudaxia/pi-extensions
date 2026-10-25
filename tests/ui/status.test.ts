@@ -4,7 +4,7 @@
  * when no theme is available.
  */
 import type { ActivePresetState } from "../../src/types.js";
-import { renderStatusBadge } from "../../src/ui/status.js";
+import { renderStatusBadge, STATUS_KEY } from "../../src/ui/status.js";
 import { createPlainTheme } from "../support/index.js";
 import { describe, expect, it } from "vitest";
 
@@ -21,6 +21,10 @@ function active(dirty: boolean): ActivePresetState {
 }
 
 describe("renderStatusBadge", () => {
+  it("uses the Pi Web command slot for the preset picker", () => {
+    expect(STATUS_KEY).toBe("command:/presets");
+  });
+
   it("renders Preset: none when no preset is active", () => {
     expect(renderStatusBadge(undefined, theme)).toBe("Preset: none");
   });

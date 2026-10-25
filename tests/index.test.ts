@@ -9,6 +9,7 @@ import { join } from "node:path";
 import presetsPlus from "../src/index.js";
 import { toPersistedPreset } from "../src/store/api.js";
 import type { LoadedPreset, ThinkingLevel } from "../src/types.js";
+import { STATUS_KEY } from "../src/ui/status.js";
 import { makeStubModelRegistry } from "./helpers/model-registry.js";
 import {
   createFakeContext,
@@ -167,7 +168,7 @@ describe("session_start configuration", () => {
     presetsPlus(fake.pi);
     await startSession(fake, ctx);
 
-    expect(status["presets-plus"]).toBeUndefined();
+    expect(status[STATUS_KEY]).toBeUndefined();
 
     await writeConfig(JSON.stringify({ version: 2, showInactiveStatus: true }));
 
@@ -177,7 +178,7 @@ describe("session_start configuration", () => {
     presetsPlus(reloaded.pi);
     await startSession(reloaded, ctx, "reload");
 
-    expect(status["presets-plus"]).toBe("Preset: none");
+    expect(status[STATUS_KEY]).toBe("Preset: none");
   });
 
   it("reports one successful migration notification", async () => {
@@ -341,7 +342,7 @@ describe("session_start configuration", () => {
     expect(spies.setActiveTools).not.toHaveBeenCalled();
     expect(fake.appendedEntries).toEqual([]);
     expect(fake.shortcuts.size).toBeGreaterThan(0);
-    expect(status["presets-plus"]).toBe("Preset: none");
+    expect(status[STATUS_KEY]).toBe("Preset: none");
     expect(beforeTurn).toEqual([undefined]);
     expect(notify).not.toHaveBeenCalledWith(
       expect.stringContaining("directory-default"),
@@ -398,7 +399,7 @@ describe("session_start configuration", () => {
         "warning",
       ],
     ]);
-    expect(status["presets-plus"]).toBe("Preset: none");
+    expect(status[STATUS_KEY]).toBe("Preset: none");
     expect(fake.shortcuts.size).toBe(0);
   });
 

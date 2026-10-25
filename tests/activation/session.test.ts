@@ -12,6 +12,7 @@ import { clear } from "../../src/activation/clear.js";
 import { statusReport } from "../../src/commands/presets/status.js";
 import { loadPresetsConfig, removePreset } from "../../src/store/api.js";
 import type { LoadedPreset } from "../../src/types.js";
+import { STATUS_KEY } from "../../src/ui/status.js";
 import {
   makePiHarness,
   reattach,
@@ -64,7 +65,7 @@ describe("session entries and badge", () => {
 
     await applyPreset(harness, plan);
 
-    expect(harness.status["presets-plus"]).toBe("Preset: plan");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan");
 
     await harness.session.clear({}, harness.ctx, harness.pi);
 
@@ -73,7 +74,7 @@ describe("session entries and badge", () => {
       { version: 1, name: "plan", scope: "project" },
       { version: 1, name: null },
     ]);
-    expect(harness.status["presets-plus"]).toBe("Preset: none");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: none");
   });
 
   it("records a rename and shows the new name", async () => {
@@ -87,7 +88,7 @@ describe("session entries and badge", () => {
       name: "draft",
       scope: "user",
     });
-    expect(harness.status["presets-plus"]).toBe("Preset: draft");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: draft");
   });
 
   it("clears the footer when inactive status is disabled", async () => {
@@ -95,15 +96,15 @@ describe("session entries and badge", () => {
 
     harness.session.setShowInactiveStatus(false, harness.ctx);
 
-    expect(harness.status["presets-plus"]).toBeUndefined();
+    expect(harness.status[STATUS_KEY]).toBeUndefined();
 
     await applyPreset(harness, plan);
 
-    expect(harness.status["presets-plus"]).toBe("Preset: plan");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan");
 
     await harness.session.clear({}, harness.ctx, harness.pi);
 
-    expect(harness.status["presets-plus"]).toBeUndefined();
+    expect(harness.status[STATUS_KEY]).toBeUndefined();
   });
 
   it("shows the dirty marker until the preset is marked clean", async () => {
@@ -117,11 +118,11 @@ describe("session entries and badge", () => {
     await applyPreset(harness, plan);
     harness.session.markDirty(harness.ctx);
 
-    expect(harness.status["presets-plus"]).toBe("Preset: plan!");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan!");
 
     harness.session.markClean(harness.ctx);
 
-    expect(harness.status["presets-plus"]).toBe("Preset: plan");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan");
   });
 });
 
@@ -141,7 +142,7 @@ describe("restoreFromBranch", () => {
     expect(result.warnings).toEqual([]);
     expect(result.state).toMatchObject({ dirty: false, name: "plan" });
     expect(harness.session.current()).toEqual(result.state);
-    expect(harness.status["presets-plus"]).toBe("Preset: plan");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: plan");
   });
 
   it("does not read an entry with another version", () => {
@@ -174,7 +175,7 @@ describe("restoreFromBranch", () => {
 
     harness.session.restoreFromBranch([], [plan], harness.ctx);
 
-    expect(harness.status["presets-plus"]).toBe("Preset: none");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: none");
   });
 
   it("warns and shows none when the preset is not loaded", () => {
@@ -192,7 +193,7 @@ describe("restoreFromBranch", () => {
         'The restored session references preset "missing", which is not loaded. Did not attach it.',
       ],
     });
-    expect(harness.status["presets-plus"]).toBe("Preset: none");
+    expect(harness.status[STATUS_KEY]).toBe("Preset: none");
   });
 
   it("clears a disabled footer when the preset is not loaded", () => {
@@ -205,7 +206,7 @@ describe("restoreFromBranch", () => {
       harness.ctx,
     );
 
-    expect(harness.status["presets-plus"]).toBeUndefined();
+    expect(harness.status[STATUS_KEY]).toBeUndefined();
   });
 
   it("warns when the preset is unavailable", () => {
@@ -497,7 +498,7 @@ describe("deleting the active preset", () => {
       expect(await removePreset("plan", "user", harness.ctx)).toEqual({
         ok: true,
       });
-      expect(harness.status["presets-plus"]).toBe("Preset: plan");
+      expect(harness.status[STATUS_KEY]).toBe("Preset: plan");
 
       const status = await statusReport(
         harness.ctx,
@@ -517,7 +518,7 @@ describe("deleting the active preset", () => {
         provider: "anthropic",
       });
       expect(harness.pi.getThinkingLevel()).toBe("medium");
-      expect(harness.status["presets-plus"]).toBe("Preset: none");
+      expect(harness.status[STATUS_KEY]).toBe("Preset: none");
     } finally {
       await dirs.cleanup();
     }

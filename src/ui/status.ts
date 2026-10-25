@@ -1,12 +1,12 @@
 /**
- * Renders the compact `presets-plus` badge that names the active preset in
+ * Renders the compact active-preset badge that names the active preset in
  * Pi's status bar.
  */
 import type { ActivePresetState } from "../types.js";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 
-/** Status-bar slot the badge registers under. */
-export const STATUS_KEY = "presets-plus";
+/** Status-bar command slot that opens the preset picker. */
+export const STATUS_KEY = "command:/presets";
 
 /** Render the active-preset status badge. */
 export function renderStatusBadge(
