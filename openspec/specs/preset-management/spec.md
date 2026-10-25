@@ -42,6 +42,21 @@ SHALL be preservable. Save SHALL NOT require a working API key.
 - **THEN** its prior value SHALL remain unchanged
 - **AND** leaving a dirty draft SHALL ask before discarding it
 
+### Requirement: Editor rows show current draft values
+
+Each field row SHALL display a preview of its current draft value, including
+empty, omitted, and inherited states. Previews SHALL refresh after edits without
+saving. Long or multiline content SHALL use bounded single-line previews without
+changing the underlying value. Row selection SHALL map the exact displayed
+option to its field independently of delimiters in user content.
+
+#### Scenario: Edit a field and return to the menu
+
+- **WHEN** the user edits a field and returns to the editor menu
+- **THEN** that field's row SHALL show the updated draft value
+- **AND** cancelling a field dialog SHALL retain the previous preview
+- **AND** Save, Save And Apply, and Cancel SHALL remain distinct actions
+
 ### Requirement: Management reuses storage and activation semantics
 
 The manager SHALL support creation, editing, duplication, deletion, cross-scope

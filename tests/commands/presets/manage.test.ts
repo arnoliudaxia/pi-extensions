@@ -386,8 +386,8 @@ describe("preset manager dialogs", () => {
 
       const setup = harness([
         "New Preset",
-        "Name",
-        "Prompt",
+        "Name: (Empty)",
+        "Prompt: (Unset)",
         "Edit",
         "Save And Apply",
       ]);

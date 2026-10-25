@@ -5,6 +5,7 @@ import {
   sameRpcDraft,
   validateRpcDraft,
 } from "./editor/rpc-draft.js";
+import { buildRpcMenu } from "./editor/rpc-menu.js";
 import {
   BACK_LABEL,
   CANCEL_LABEL,
@@ -12,7 +13,6 @@ import {
   EDIT_LABEL,
   MODEL_LABEL,
   PROMPT_EDITOR_TITLE,
-  SAVE_LABEL,
   SCOPE_LABEL,
   THINKING_LABEL,
   TOOLS_LABEL,
@@ -34,8 +34,6 @@ const NAME_LABEL = "Name";
 const PROVIDER_LABEL = "Provider";
 const PROMPT_LABEL = "Prompt";
 const HOTKEY_LABEL = "Hotkey";
-const ORDER_LABEL = "Order";
-const SAVE_APPLY_LABEL = "Save And Apply";
 const INHERIT_LABEL = "Inherit";
 const DEFAULT_THINKING_LABEL = "Default (Off)";
 const MANUAL_LABEL = "Enter ID Manually";
@@ -43,20 +41,6 @@ const DONE_LABEL = "Done";
 const ADD_TOOL_LABEL = "Add Tool";
 const PRESET_TOOLS_LABEL = "Use Preset Tools";
 const ACTIVE_TOOLS_LABEL = "Use Active Tools";
-const MENU = [
-  NAME_LABEL,
-  SCOPE_LABEL,
-  PROVIDER_LABEL,
-  MODEL_LABEL,
-  THINKING_LABEL,
-  TOOLS_LABEL,
-  PROMPT_LABEL,
-  HOTKEY_LABEL,
-  ORDER_LABEL,
-  SAVE_LABEL,
-  SAVE_APPLY_LABEL,
-  CANCEL_LABEL,
-];
 
 /** Submit a lossless draft for the caller to save, without applying or writing it. */
 export async function openRpcEditor(
@@ -69,9 +53,11 @@ export async function openRpcEditor(
   showIssues(ui, options.issues ?? []);
 
   for (;;) {
-    const choice = await ui.select(options.title, [...MENU]);
+    const menu = buildRpcMenu(draft);
+    const selected = await ui.select(options.title, [...menu.keys()]);
+    const choice = selected === undefined ? undefined : menu.get(selected);
 
-    if (choice === undefined || choice === CANCEL_LABEL) {
+    if (selected === undefined || choice === "cancel") {
       if (
         sameRpcDraft(draft, baseline) ||
         (await ui.confirm(
@@ -85,7 +71,7 @@ export async function openRpcEditor(
       continue;
     }
 
-    if (choice === SAVE_LABEL || choice === SAVE_APPLY_LABEL) {
+    if (choice === "save" || choice === "save-apply") {
       const issues = validateRpcDraft(draft, options);
 
       showIssues(ui, issues);
@@ -96,13 +82,13 @@ export async function openRpcEditor(
 
       return {
         kind: "submitted",
-        intent: choice === SAVE_LABEL ? "save" : "save-apply",
+        intent: choice,
         draft: cloneRpcDraft(draft),
       };
     }
 
-    if (choice === PROVIDER_LABEL || choice === MODEL_LABEL) {
-      const field = choice === PROVIDER_LABEL ? "provider" : "model";
+    if (choice === "provider" || choice === "model") {
+      const field = choice;
       const value = await selectId(ui, field, draft, options);
 
       if (value !== undefined) draft = withField(draft, field, value);
@@ -110,13 +96,12 @@ export async function openRpcEditor(
       continue;
     }
 
-    if (choice === PROMPT_LABEL || choice === HOTKEY_LABEL) {
-      const field = choice === PROMPT_LABEL ? "instructions" : "hotkey";
-      const action = await ui.select(choice, [
-        EDIT_LABEL,
-        CLEAR_LABEL,
-        BACK_LABEL,
-      ]);
+    if (choice === "instructions" || choice === "hotkey") {
+      const field = choice;
+      const action = await ui.select(
+        field === "instructions" ? PROMPT_LABEL : HOTKEY_LABEL,
+        [EDIT_LABEL, CLEAR_LABEL, BACK_LABEL],
+      );
 
       if (action === CLEAR_LABEL) {
         draft = withField(draft, field, undefined);
@@ -134,7 +119,7 @@ export async function openRpcEditor(
     }
 
     switch (choice) {
-      case NAME_LABEL: {
+      case "name": {
         const value = await editSingleLine(ui, NAME_LABEL, draft.preset.name);
 
         if (value !== undefined) draft = withField(draft, "name", value);
@@ -142,7 +127,7 @@ export async function openRpcEditor(
         break;
       }
 
-      case SCOPE_LABEL: {
+      case "scope": {
         const scope = await ui.select(
           `${SCOPE_LABEL} (Current: ${draft.scope === "user" ? "User" : "Project"})`,
           ["User", "Project"],
@@ -162,7 +147,7 @@ export async function openRpcEditor(
         break;
       }
 
-      case THINKING_LABEL: {
+      case "thinkingLevel": {
         const level = await ui.select(
           `${THINKING_LABEL} (Current: ${draft.preset.thinkingLevel ?? DEFAULT_THINKING_LABEL})`,
           [DEFAULT_THINKING_LABEL, ...THINKING_LEVELS],
@@ -181,11 +166,11 @@ export async function openRpcEditor(
         break;
       }
 
-      case TOOLS_LABEL:
+      case "tools":
         draft = await editTools(ui, draft, options);
 
         break;
-      case ORDER_LABEL:
+      case "order":
         draft = await editOrder(ui, draft);
 
         break;

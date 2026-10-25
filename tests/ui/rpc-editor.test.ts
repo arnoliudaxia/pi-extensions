@@ -67,7 +67,9 @@ function harness(steps: Step[], overrides: Partial<RpcEditorOptions> = {}) {
         ? rows[value]
         : value instanceof RegExp
           ? rows.find((row) => value.test(row))
-          : value;
+          : typeof value === "string" && _title === options.title
+            ? literalLabel(rows, value)
+            : value;
 
     if (value !== undefined) expect(rows).toContain(choice);
 
@@ -123,6 +125,17 @@ function harness(steps: Step[], overrides: Partial<RpcEditorOptions> = {}) {
   };
 }
 
+/** Resolve test shorthand to the actual displayed row, never a production alias. */
+function literalLabel(rows: string[], label: string): string | undefined {
+  return rows.find((row) => row === label || row.startsWith(`${label}: `));
+}
+
+function menus(setup: ReturnType<typeof harness>): string[][] {
+  return setup.select.mock.calls
+    .filter(([title]) => title === setup.options.title)
+    .map(([, rows]) => rows);
+}
+
 function select(value?: string | RegExp | number): Step {
   return { kind: "select", value };
 }
@@ -146,15 +159,15 @@ describe("openRpcEditor", () => {
       expect(result.draft.preset).not.toBe(PRESET);
       expect(result.draft.preset.tools).not.toBe(PRESET.tools);
       expect(setup.select.mock.calls[0]?.[1]).toEqual([
-        "Name",
-        "Scope",
-        "Provider",
-        "Model",
-        THINKING_LABEL,
-        "Tools",
-        "Prompt",
-        "Hotkey",
-        "Order",
+        "Name: Original",
+        "Scope: User",
+        "Provider: manual-provider",
+        "Model: unknown-model",
+        `${THINKING_LABEL}: Off`,
+        'Tools: \\["unknown","read"\\]',
+        "Prompt: Keep all whitespace.",
+        "Hotkey: Shift+Ctrl+1",
+        "Order: 0",
         "Save",
         "Save And Apply",
         "Cancel",
@@ -230,6 +243,24 @@ describe("openRpcEditor", () => {
         },
       },
     });
+
+    const mainMenus = menus(setup);
+    const updates = [
+      "Name: Renamed",
+      "Scope: Project",
+      "Provider: custom-provider",
+      "Model: custom-model",
+      `${THINKING_LABEL}: Max`,
+      'Tools: \\["unknown","read","bash","custom-tool"\\]',
+      "Prompt: new prompt",
+      "Hotkey: Ctrl+Shift+2",
+      "Order: -2.5",
+    ];
+
+    updates.forEach((row, index) => {
+      expect(mainMenus[index + 1]).toContain(row);
+      expect(mainMenus.at(-1)).toContain(row);
+    });
     expect(BASELINE.preset).toStrictEqual(PRESET);
     expect(PRESET.tools).toEqual(["unknown", "read"]);
     setup.finished();
@@ -284,6 +315,7 @@ describe("openRpcEditor", () => {
     if (result.kind !== "submitted") throw new Error("Expected submission.");
 
     expect(result.draft.preset).not.toHaveProperty("thinkingLevel");
+    expect(menus(setup)[1]).toContain(`${THINKING_LABEL}: Default (Off)`);
     setup.finished();
 
     const second = harness(
@@ -308,6 +340,7 @@ describe("openRpcEditor", () => {
         "max",
       ],
     ]);
+    expect(menus(second)[1]).toContain(`${THINKING_LABEL}: Off`);
     expect(second.select.mock.calls[1]?.[1]).not.toContain("Inherit");
     second.finished();
   });
@@ -329,6 +362,13 @@ describe("openRpcEditor", () => {
       if (expected === undefined)
         expect(result.draft.preset).not.toHaveProperty("tools");
 
+      expect(menus(setup)[1]).toContain(
+        expected === undefined
+          ? "Tools: Inherit (omitted)"
+          : expected.length === 0
+            ? "Tools: Inherit ([]: empty list)"
+            : 'Tools: \\["bash"\\]',
+      );
       setup.finished();
     },
   );
@@ -418,6 +458,9 @@ describe("openRpcEditor", () => {
     expect(result.draft.preset).not.toHaveProperty("instructions");
     expect(result.draft.preset).not.toHaveProperty("hotkey");
     expect(result.draft.preset).not.toHaveProperty("order");
+    expect(menus(setup)[1]).toContain("Prompt: (Unset)");
+    expect(menus(setup)[2]).toContain("Hotkey: (Unset)");
+    expect(menus(setup)[3]).toContain("Order: (Unset)");
     setup.finished();
   });
 
@@ -492,6 +535,7 @@ describe("openRpcEditor", () => {
       draft: BASELINE,
     });
     expect(setup.confirm).not.toHaveBeenCalled();
+    for (const rows of menus(setup)) expect(rows).toEqual(menus(setup)[0]);
     setup.finished();
   });
 
@@ -529,6 +573,11 @@ describe("openRpcEditor", () => {
       },
     });
     expect(setup.confirm).toHaveBeenCalledTimes(2);
+
+    for (const rows of menus(setup).slice(1)) {
+      expect(rows).toContain("Name: Changed");
+    }
+
     setup.finished();
   });
 
@@ -643,11 +692,91 @@ describe("openRpcEditor", () => {
       draft: initial,
     });
     expect(initial.preset.instructions).toBe("\n draft \n");
+
+    for (const rows of menus(setup)) {
+      expect(rows).toContain("Name: Failed Save");
+      expect(rows).toContain("Prompt: draft");
+      expect(rows).toContain("Tools: Inherit ([]: empty list)");
+    }
+
     expect(setup.notify).toHaveBeenCalledWith(
       expect.stringContaining("destination changed"),
       "warning",
     );
     expect(setup.confirm).toHaveBeenCalledOnce();
+    setup.finished();
+  });
+
+  it("routes complete rows with colons and refreshes after an editor cancellation", async () => {
+    const setup = harness([
+      select("Name"),
+      editor("Name: Save: Cancel"),
+      select("Name: Name: Save: Cancel"),
+      editor(undefined, "Name: Save: Cancel"),
+      select("Provider"),
+      select("Enter ID Manually"),
+      editor("https://provider:8080"),
+      select("Model"),
+      select("Enter ID Manually"),
+      editor("model:variant"),
+      select("Save"),
+    ]);
+
+    expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+      draft: {
+        preset: {
+          name: "Name: Save: Cancel",
+          provider: "https://provider:8080",
+          model: "model:variant",
+        },
+      },
+    });
+
+    const mainMenus = menus(setup);
+
+    expect(mainMenus[1]).toEqual(mainMenus[2]);
+    expect(mainMenus.at(-1)).toContain("Provider: https://provider:8080");
+    expect(mainMenus.at(-1)).toContain("Model: model:variant");
+    setup.finished();
+  });
+
+  it("round-trips a long Unicode multiline prompt and uses its raw value as editor prefill", async () => {
+    const instructions = ` \n\t中文😀 **not markup**\r\n${"长文👩‍💻".repeat(80)}\n\n `;
+    const setup = harness([
+      select("Prompt"),
+      select("Edit"),
+      editor(instructions, PRESET.instructions),
+      select("Prompt"),
+      select("Edit"),
+      editor(undefined, instructions),
+      select("Save"),
+    ]);
+
+    expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+      draft: { preset: { instructions } },
+    });
+
+    const mainMenus = menus(setup);
+    const prompt = mainMenus[1]?.find((row) => row.startsWith("Prompt: "));
+
+    expect(prompt).toContain("中文😀 \\*\\*not markup\\*\\*");
+    expect(prompt).toMatch(/…$/u);
+    expect(prompt).not.toMatch(/[\r\n\t]/u);
+    expect(mainMenus[2]).toEqual(mainMenus[1]);
+    setup.finished();
+  });
+
+  it("does not dispatch an undisplayed old field label or stale full row", async () => {
+    const setup = harness([select("Name"), editor("Changed"), select("Save")]);
+
+    setup.select
+      .mockResolvedValueOnce("Name")
+      .mockResolvedValueOnce("Name: stale");
+
+    expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+      draft: { preset: { name: "Changed" } },
+    });
+    expect(setup.editor).toHaveBeenCalledOnce();
     setup.finished();
   });
 
