@@ -1,19 +1,65 @@
 {
-  "name": "pi-extensions",
-  "private": true,
+  "name": "@sherif-fanous/pi-presets-plus",
+  "version": "0.13.0",
+  "description": "Pi extension that bundles a model, thinking level, tools, and system prompt into switchable presets",
+  "keywords": [
+    "pi",
+    "pi-coding-agent",
+    "pi-package",
+    "presets",
+    "favorites",
+    "model-presets",
+    "thinking-presets",
+    "tools-presets",
+    "system-prompt-presets"
+  ],
+  "homepage": "https://github.com/arnoliudaxia/pi-extensions#readme",
+  "bugs": {
+    "url": "https://github.com/arnoliudaxia/pi-extensions/issues"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arnoliudaxia/pi-extensions.git"
+  },
+  "license": "MIT",
+  "author": "Sherif Fanous",
   "type": "module",
+  "files": [
+    "src",
+    "README.md",
+    "LICENSE",
+    "CHANGELOG.md",
+    "package.json"
+  ],
+  "dependencies": {
+    "@sherif-fanous/pi-extensions-core": "0.1.0"
+  },
   "devDependencies": {
-    "@changesets/cli": "catalog:",
-    "@eslint/js": "catalog:",
-    "@ianvs/prettier-plugin-sort-imports": "catalog:",
-    "@stylistic/eslint-plugin": "catalog:",
-    "eslint": "catalog:",
-    "eslint-plugin-perfectionist": "catalog:",
-    "eslint-plugin-unicorn": "catalog:",
-    "prettier": "catalog:",
-    "sort-package-json": "catalog:",
-    "typescript": "catalog:",
-    "typescript-eslint": "catalog:",
-    "vitest": "catalog:"
+    "@changesets/cli": "^3.0.3",
+    "@earendil-works/pi-ai": "1.3.0",
+    "@earendil-works/pi-coding-agent": "1.3.0",
+    "@earendil-works/pi-tui": "1.3.0",
+    "@eslint/js": "^10.0.1",
+    "@ianvs/prettier-plugin-sort-imports": "^4.7.1",
+    "@stylistic/eslint-plugin": "^5.10.0",
+    "@types/node": "25.9.8",
+    "eslint": "^10.10.0",
+    "eslint-plugin-perfectionist": "^5.11.0",
+    "eslint-plugin-unicorn": "^78.0.0",
+    "prettier": "^3.9.6",
+    "sort-package-json": "^4.0.0",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.70.0",
+    "vitest": "^5.0.0"
+  },
+  "peerDependencies": {
+    "@earendil-works/pi-ai": "*",
+    "@earendil-works/pi-coding-agent": "*",
+    "@earendil-works/pi-tui": "*"
+  },
+  "pi": {
+    "extensions": [
+      "./src/index.ts"
+    ]
   }
 }

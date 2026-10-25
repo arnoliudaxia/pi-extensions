@@ -1,0 +1,123 @@
+/**
+ * Mounts the preset picker against a fake Pi context so tests can drive
+ * and render it, plus the small preset and rendering helpers those tests
+ * share.
+ */
+import { ActivePresetSession } from "../../src/activation/session.js";
+import { HotkeyRegistry } from "../../src/hotkey-registry.js";
+import type { LoadedPreset } from "../../src/types.js";
+import type { openPicker as openPickerType } from "../../src/ui/picker.js";
+import {
+  createFakeCustom,
+  createFakeTui,
+  createPiKeybindings,
+  createPlainTheme,
+  stripAnsi,
+} from "../support/index.js";
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import type { Component } from "@earendil-works/pi-tui";
+import { vi, type Mock } from "vitest";
+
+/** A mounted picker and the activation callback it was opened with. */
+export interface MountedPicker {
+  readonly component: Component;
+  readonly onActivate: Mock;
+}
+
+/** What to show in the mounted picker. */
+export interface MountPickerOptions {
+  /** Preset the session is restored to; it need not appear in `presets`. */
+  readonly active?: LoadedPreset;
+  /** Marks the restored active preset dirty. */
+  readonly dirty?: boolean;
+  readonly presets: readonly LoadedPreset[];
+  readonly terminalRows?: number;
+  readonly theme?: Theme;
+}
+
+/** Build a minimal loaded preset with a fixed provider and model. */
+export function makeLoadedPreset(
+  name: string,
+  scope: LoadedPreset["scope"] = "user",
+): LoadedPreset {
+  return {
+    model: "claude-opus-4.5",
+    name,
+    provider: "anthropic",
+    scope,
+  };
+}
+
+/**
+ * Return a function that opens the picker over fake presets and returns
+ * the mounted component.
+ *
+ * Pass the test file's mocked `loadPresetsConfig`. The picker module is imported on
+ * each call, after the test file has registered its store mock.
+ */
+export function pickerMounter(
+  loadPresetsConfig: Mock,
+): (options: MountPickerOptions) => Promise<MountedPicker> {
+  return async (options) => {
+    const { openPicker } = await import("../../src/ui/picker.js");
+    let component: Component | undefined;
+    const session = new ActivePresetSession();
+    const onActivate = vi
+      .fn()
+      .mockResolvedValue({ kind: "applied", warnings: [] });
+    const ctx = {
+      getActiveTools: () => [],
+      ui: {
+        custom: createFakeCustom({
+          keybindings: createPiKeybindings(),
+          // Hand the picker back without closing it, so tests keep driving it.
+          onMount: (mounted, done) => {
+            component = mounted;
+            done(undefined);
+          },
+          theme: options.theme,
+          tui: createFakeTui(120, options.terminalRows ?? 24).tui,
+        }),
+        notify: vi.fn(),
+        setStatus: vi.fn(),
+        theme: createPlainTheme(),
+      },
+    } as unknown as Parameters<typeof openPickerType>[0];
+
+    loadPresetsConfig.mockResolvedValue({
+      presets: options.presets,
+      warnings: [],
+    });
+
+    if (options.active) {
+      session.restoreFromBranch(
+        [
+          {
+            customType: "presets-plus:active",
+            data: { name: options.active.name, scope: options.active.scope },
+            type: "custom",
+          },
+        ] as never,
+        [options.active],
+        ctx,
+      );
+
+      if (options.dirty) session.markDirty(ctx);
+    }
+
+    await openPicker(ctx, {
+      hotkeys: new HotkeyRegistry(),
+      onActivate,
+      session,
+    });
+
+    if (!component) throw new Error("Picker component was not mounted.");
+
+    return { component, onActivate };
+  };
+}
+
+/** Render a component and strip its ANSI sequences, one entry per line. */
+export function renderLines(component: Component, width = 100): string[] {
+  return component.render(width).map(stripAnsi);
+}

@@ -1,29 +1,6 @@
-packages:
-  - packages/*
+# Installation policy only; this repository contains a single package.
 allowBuilds:
   "@google/genai": false
   esbuild: true
   koffi: true
   protobufjs: true
-catalog:
-  "@changesets/apply-release-plan": ^8.1.1
-  "@changesets/assemble-release-plan": ^7.0.0
-  "@changesets/cli": ^3.0.3
-  "@changesets/config": ^4.0.1
-  "@changesets/read": ^1.0.1
-  "@changesets/types": ^7.0.0
-  "@earendil-works/pi-ai": 1.3.0
-  "@earendil-works/pi-coding-agent": 1.3.0
-  "@earendil-works/pi-tui": 1.3.0
-  "@eslint/js": ^10.0.1
-  "@ianvs/prettier-plugin-sort-imports": ^4.7.1
-  "@manypkg/get-packages": ^3.1.0
-  "@stylistic/eslint-plugin": ^5.10.0
-  eslint: ^10.10.0
-  eslint-plugin-perfectionist: ^5.11.0
-  eslint-plugin-unicorn: ^78.0.0
-  prettier: ^3.9.6
-  sort-package-json: ^4.0.0
-  typescript: ^6.0.3
-  typescript-eslint: ^8.70.0
-  vitest: ^5.0.0

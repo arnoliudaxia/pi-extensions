@@ -1,11 +1,16 @@
 schema: spec-driven
 
 context: |
-  This OpenSpec root belongs to the sherif-fanous/pi-extensions monorepo, a
-  pnpm workspace of Pi coding agent extensions. Shared runtime helpers live in
-  @sherif-fanous/pi-extensions-core and test doubles in
-  @sherif-fanous/pi-extensions-testing. AGENTS.md at the repository root is
-  the family style guide for text, config, TUI, and tooling.
+  This OpenSpec root belongs to the standalone Presets Plus fork at
+  arnoliudaxia/pi-extensions, originally by Sherif Fanous. The repository keeps
+  its pi-extensions name but contains only pi-presets-plus, with src/, tests/,
+  and openspec/ at the root. Runtime helpers come from the npm dependency
+  @sherif-fanous/pi-extensions-core pinned to 0.1.0. Test doubles and assertions
+  from the former private testing package live in tests/support/. AGENTS.md
+  at the repository root defines the code, text, configuration, and UI rules.
+  Prefer the mise tasks in mise.toml; CONTRIBUTING.md documents equivalent
+  commands when mise is unavailable. Preserve original authorship, the MIT
+  license, and released changelog history.
 
   Pi documentation (also installed under
   node_modules/@earendil-works/pi-coding-agent/docs/):

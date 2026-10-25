@@ -1,47 +1,42 @@
 [env]
-_.file = ".env"
 _.path = ["{{config_root}}/node_modules/.bin"]
+
+[tasks.check]
+depends = ["format-check", "type-check", "lint", "test", "changeset-check"]
+
+[tasks.format]
+run = "sort-package-json package.json && prettier --write ."
+
+[tasks.format-check]
+run = "sort-package-json --check package.json && prettier --check ."
+
+[tasks.type-check]
+run = "tsc --noEmit"
+
+[tasks.lint]
+run = "eslint src/. tests/."
+
+[tasks.lint-fix]
+run = "eslint src/. tests/. --fix"
+
+[tasks.test]
+run = "vitest --run"
+
+[tasks.test-watch]
+run = "vitest"
 
 [tasks.changeset]
 run = "changeset add"
 
 [tasks.changeset-check]
-# Fails on a pending changeset that `mise run version` would reject.
-run = "node packages/pi-extensions-release/src/check.ts"
-
-# Prettier skips what .gitignore and .prettierignore list; each package
-# formats its own files. Every package.json is sorted from here.
-[tasks.format]
-run = "sort-package-json package.json 'packages/*/package.json' && prettier --write . '!packages/**'"
-
-[tasks.format-check]
-run = "sort-package-json --check package.json 'packages/*/package.json' && prettier --check . '!packages/**'"
-
-[tasks.publish]
-depends = ["check"]
-# Publishes every package whose version is not on npm yet, dependencies
-# first, and tags each release `<name>@<version>`. pnpm 12 stopped expanding
-# `${NPM_ACCESS_TOKEN}` from .npmrc, so the token goes straight to pnpm as
-# npm-style config instead.
-run = '''
-: "${NPM_ACCESS_TOKEN:?Set NPM_ACCESS_TOKEN in .env to an npm token with publish rights for @sherif-fanous}"
-exec env "npm_config_//registry.npmjs.org/:_authToken=$NPM_ACCESS_TOKEN" changeset publish
-'''
+run = "changeset status"
 
 [tasks.version]
-# Use this instead of `changeset version`, which refuses to run: see
-# packages/pi-extensions-release.
-run = "node packages/pi-extensions-release/src/version.ts"
+run = "changeset version"
 
-# pnpm's npm package replaces its launcher with its native binary in an install
-# script. mise skips npm install scripts unless `allow_builds` names the
-# package, and without that script pnpm's launcher fails with ENOEXEC when a
-# program on macOS spawns it, as `changeset publish` does.
 [settings]
 npm.package_manager = "npm"
 
-# Major versions only: the newest release within each. Moving to a new major
-# is a change to this file.
 [tools]
 node = "24"
 "npm:pnpm" = { version = "12", allow_builds = ["pnpm"] }
