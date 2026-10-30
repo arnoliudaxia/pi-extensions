@@ -33,6 +33,7 @@ const GRAPHEMES = new Intl.Segmenter(undefined, { granularity: "grapheme" });
 /** Map only the displayed rows to stable identities, including unchanged actions. */
 export function buildRpcMenu(
   draft: RpcPresetDraft,
+  showTerminalFields = false,
 ): Map<string, RpcMenuChoice> {
   const { preset } = draft;
   const tools =
@@ -53,8 +54,12 @@ export function buildRpcMenu(
     ],
     [`${TOOLS_LABEL}: ${tools}`, "tools"],
     [`Prompt: ${preview(preset.instructions)}`, "instructions"],
-    [`Hotkey: ${preview(preset.hotkey)}`, "hotkey"],
-    [`Order: ${preset.order?.toString() ?? "(Unset)"}`, "order"],
+    ...(showTerminalFields
+      ? ([
+          [`Hotkey: ${preview(preset.hotkey)}`, "hotkey"],
+          [`Order: ${preset.order?.toString() ?? "(Unset)"}`, "order"],
+        ] as const)
+      : []),
     [SAVE_LABEL, "save"],
     ["Save And Apply", "save-apply"],
     [CANCEL_LABEL, "cancel"],

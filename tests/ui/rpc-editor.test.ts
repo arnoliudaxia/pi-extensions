@@ -35,10 +35,16 @@ const MODELS: ModelItem[] = [
     model: { reasoning: false } as Model<Api>,
   },
   {
+    provider: "no-key-in-name",
+    id: "authenticated-model",
+    available: true,
+    model: { reasoning: false } as Model<Api>,
+  },
+  {
     provider: "registered",
     id: "available-model",
     available: true,
-    model: { reasoning: true } as Model<Api>,
+    model: { name: "Registered Model", reasoning: true } as Model<Api>,
   },
   {
     provider: "no-key-provider",
@@ -107,6 +113,7 @@ function harness(steps: Step[], overrides: Partial<RpcEditorOptions> = {}) {
     allTools: ["read", "bash"],
     activeTools: ["bash"],
     projectTrusted: true,
+    showTerminalFields: true,
     ...overrides,
   };
 
@@ -141,6 +148,87 @@ function select(value?: string | RegExp | number): Step {
 }
 
 describe("openRpcEditor", () => {
+  it.each([
+    { order: undefined, action: "Save" },
+    { order: 0, action: "Save And Apply" },
+    { order: -2.5, action: "Save" },
+  ])(
+    "hides RPC Order controls and preserves $order on $action",
+    async ({ order, action }) => {
+      const baseline: RpcPresetDraft = {
+        ...BASELINE,
+        preset: { ...PRESET, ...(order === undefined ? {} : { order }) },
+      };
+
+      if (order === undefined) delete baseline.preset.order;
+
+      const setup = harness(
+        [select("Name"), editor("Renamed"), select(action)],
+        { baseline, showTerminalFields: false },
+      );
+
+      setup.select
+        .mockResolvedValueOnce("Order")
+        .mockResolvedValueOnce("Order: 0")
+        .mockResolvedValueOnce("Order: (Unset)");
+
+      expect(await openRpcEditor(setup.ui, setup.options)).toStrictEqual({
+        kind: "submitted",
+        intent: action === "Save" ? "save" : "save-apply",
+        draft: { ...baseline, preset: { ...baseline.preset, name: "Renamed" } },
+      });
+
+      for (const rows of menus(setup)) {
+        expect(rows.some((row) => row.startsWith("Order"))).toBe(false);
+      }
+
+      expect(setup.editor).toHaveBeenCalledExactlyOnceWith("Name", PRESET.name);
+      setup.finished();
+    },
+  );
+
+  it.each([undefined, "", " Shift+Ctrl+1 "])(
+    "hides RPC hotkey controls while preserving the value %j through other edits",
+    async (hotkey) => {
+      const baseline: RpcPresetDraft = {
+        ...BASELINE,
+        preset: {
+          ...PRESET,
+          ...(hotkey === undefined ? {} : { hotkey }),
+        },
+      };
+
+      if (hotkey === undefined) delete baseline.preset.hotkey;
+
+      const setup = harness(
+        [select("Name"), editor("Renamed"), select("Save")],
+        { baseline, showTerminalFields: false },
+      );
+
+      setup.select
+        .mockResolvedValueOnce("Hotkey")
+        .mockResolvedValueOnce("Hotkey: Shift+Ctrl+1");
+
+      expect(await openRpcEditor(setup.ui, setup.options)).toStrictEqual({
+        kind: "submitted",
+        intent: "save",
+        draft: { ...baseline, preset: { ...baseline.preset, name: "Renamed" } },
+      });
+
+      for (const rows of menus(setup)) {
+        expect(rows.some((row) => row.startsWith("Hotkey"))).toBe(false);
+      }
+
+      expect(setup.editor).toHaveBeenCalledExactlyOnceWith("Name", PRESET.name);
+      expect(
+        setup.notify.mock.calls.some(([message]) =>
+          /hotkey|unsupported key/i.test(String(message)),
+        ),
+      ).toBe(false);
+      setup.finished();
+    },
+  );
+
   it.each(["Save", "Save And Apply"])(
     "round-trips every persisted field without loss on %s",
     async (action) => {
@@ -266,18 +354,25 @@ describe("openRpcEditor", () => {
     setup.finished();
   });
 
-  it("offers no-key registry entries and never snaps thinking or resets other fields", async () => {
+  it("preserves an unauthenticated provider on cancellation and still offers its models", async () => {
     const setup = harness(
       [
         select("Provider"),
-        select(/"no-key-provider".*no key/),
+        select(),
         select("Model"),
         select(/"another-model".*no key/),
         select("Save"),
       ],
       {
         models: MODELS,
-        baseline: { ...BASELINE, preset: { ...PRESET, thinkingLevel: "max" } },
+        baseline: {
+          ...BASELINE,
+          preset: {
+            ...PRESET,
+            provider: "no-key-provider",
+            thinkingLevel: "max",
+          },
+        },
       },
     );
 
@@ -299,6 +394,142 @@ describe("openRpcEditor", () => {
       expect.stringContaining("no API key"),
       "warning",
     );
+    setup.finished();
+  });
+
+  it("hides unauthenticated providers but keeps no-key models of an authenticated provider", async () => {
+    const setup = harness(
+      [
+        select("Provider"),
+        select('1. "registered"'),
+        select("Model"),
+        select('1. "no-key-model" (no key)'),
+        select("Save"),
+      ],
+      { models: MODELS },
+    );
+
+    expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+      kind: "submitted",
+      draft: { preset: { provider: "registered", model: "no-key-model" } },
+    });
+
+    expect(setup.select.mock.calls[1]?.[1]).toEqual([
+      '1. "registered"',
+      '2. "no-key-in-name"',
+      "Enter ID Manually",
+      "Cancel",
+    ]);
+
+    expect(setup.select.mock.calls[3]?.[1]).toEqual([
+      '1. "no-key-model" (no key)',
+      '2. "available-model" (Name: "Registered Model")',
+      "Enter ID Manually",
+      "Cancel",
+    ]);
+
+    expect(setup.notify).toHaveBeenCalledWith(
+      "This model has no API key configured. The preset can still be saved.",
+      "warning",
+    );
+    setup.finished();
+  });
+
+  it.each([
+    { name: "Display name", label: ' (Name: "Display name")' },
+    { name: "model-id", label: ' (Name: "model-id")' },
+    { name: undefined, label: "" },
+    { name: "", label: "" },
+    { name: "   ", label: "" },
+  ])(
+    "shows the ID and optional name $name without changing the saved ID",
+    async ({ name, label }) => {
+      const setup = harness([select("Model"), select(0), select("Save")], {
+        baseline: {
+          scope: "user",
+          preset: { ...PRESET, provider: "registered" },
+        },
+        models: [
+          {
+            provider: "registered",
+            id: "model-id",
+            available: false,
+            model: {
+              ...(name === undefined ? {} : { name }),
+              reasoning: false,
+            } as Model<Api>,
+          },
+        ],
+      });
+
+      expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+        kind: "submitted",
+        draft: { preset: { provider: "registered", model: "model-id" } },
+      });
+
+      expect(setup.select.mock.calls[1]?.[1]).toEqual([
+        `1. "model-id"${label} (no key)`,
+        "Enter ID Manually",
+        "Cancel",
+      ]);
+
+      expect(setup.notify).toHaveBeenCalledWith(
+        expect.stringContaining("no API key"),
+        "warning",
+      );
+      setup.finished();
+    },
+  );
+
+  it.each([0, 1])(
+    "maps duplicate names and escaped characters to the actual ID at row %s",
+    async (index) => {
+      const name = 'Shared "name"\n\\中文 (no key)';
+      const ids = ['model"one\\variant', 'model:two (Name: "other")'];
+      const setup = harness([select("Model"), select(index), select("Save")], {
+        baseline: {
+          scope: "user",
+          preset: { ...PRESET, provider: "registered" },
+        },
+        models: ids.map((id) => ({
+          provider: "registered",
+          id,
+          available: true,
+          model: { name, reasoning: false } as Model<Api>,
+        })),
+      });
+
+      expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+        kind: "submitted",
+        draft: { preset: { model: ids[index] } },
+      });
+
+      expect(setup.select.mock.calls[1]?.[1]).toEqual([
+        ...ids.map(
+          (id, row) =>
+            `${row + 1}. ${JSON.stringify(id)} (Name: ${JSON.stringify(name)})`,
+        ),
+        "Enter ID Manually",
+        "Cancel",
+      ]);
+      setup.finished();
+    },
+  );
+
+  it("keeps manual entry and cancellation when no providers are authenticated", async () => {
+    const setup = harness([select("Provider"), select(), select("Save")], {
+      models: MODELS.map((model) => ({ ...model, available: false })),
+    });
+
+    expect(await openRpcEditor(setup.ui, setup.options)).toMatchObject({
+      kind: "submitted",
+      draft: BASELINE,
+    });
+
+    expect(setup.select.mock.calls[1]?.[1]).toEqual([
+      "Enter ID Manually",
+      "Cancel",
+    ]);
     setup.finished();
   });
 

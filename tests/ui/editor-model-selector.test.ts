@@ -16,6 +16,7 @@ const models = [
   { id: "opus-5", provider: "anthropic", name: "Opus 5", reasoning: true },
   { id: "z-first", provider: "other", name: "First", reasoning: false },
   { id: "a-second", provider: "other", name: "Astra", reasoning: true },
+  { id: "locked-model", provider: "locked", name: "Locked", reasoning: true },
 ];
 const seed: LoadedPreset = {
   name: "draft",
@@ -31,7 +32,10 @@ function focus(component: Component, count: number): void {
   for (let i = 0; i < count; i++) send(component, "\t");
 }
 
-async function harness(initial: LoadedPreset | null = seed) {
+async function harness(
+  initial: LoadedPreset | null = seed,
+  authenticated = true,
+) {
   const mounted: Mounted[] = [];
   const handle = { setHidden: vi.fn(), focus: vi.fn() };
   const onTest = vi.fn().mockResolvedValue({ ok: false });
@@ -62,7 +66,9 @@ async function harness(initial: LoadedPreset | null = seed) {
     modelRegistry: {
       getAll: () => models,
       hasConfiguredAuth: (model: (typeof models)[number]) =>
-        model.id !== "opus-first",
+        authenticated &&
+        model.id !== "opus-first" &&
+        model.provider !== "locked",
     },
     ui: { custom },
   };
@@ -113,6 +119,8 @@ describe("editor model selector", () => {
 
     expect(text(selector)).toContain("→ anthropic");
     expect(text(selector).match(/anthropic/g)).toHaveLength(1);
+    expect(text(selector)).toContain("other");
+    expect(text(selector)).not.toContain("locked");
     type(selector, "other");
     send(selector, "\r");
     await restored(test.handle);
@@ -120,6 +128,60 @@ describe("editor model selector", () => {
     expect(text(test.editor)).toMatch(/Model\s+z-first/);
     expect(text(test.editor)).toContain("● off");
     expect(test.mounted).toHaveLength(2);
+  });
+
+  it("preserves an unauthenticated current provider until a new choice is confirmed", async () => {
+    const test = await harness({
+      ...seed,
+      provider: "locked",
+      model: "locked-model",
+    });
+
+    focus(test.editor, 2);
+
+    const before = text(test.editor);
+
+    send(test.editor, "\r");
+    expect(text(componentAt(test.mounted, 1))).not.toContain("locked");
+    send(componentAt(test.mounted, 1), "\u001b");
+    await restored(test.handle);
+    expect(text(test.editor)).toBe(before);
+    focus(test.editor, 1);
+    send(test.editor, "\r");
+    expect(text(componentAt(test.mounted, 2))).toContain(
+      "locked-model (no key)",
+    );
+    send(componentAt(test.mounted, 2), "\u001b");
+    await restored(test.handle, 2);
+    send(test.editor, "\u001b[Z");
+    send(test.editor, "\u001b[C");
+    expect(text(test.editor)).toMatch(/Provider\s+anthropic/);
+  });
+
+  it("keeps the current provider when none are authenticated", async () => {
+    const test = await harness(seed, false);
+
+    focus(test.editor, 2);
+
+    const before = text(test.editor);
+
+    send(test.editor, "\u001b[C");
+    expect(text(test.editor)).toBe(before);
+    send(test.editor, "\r");
+    expect(text(componentAt(test.mounted, 1))).not.toContain("→ anthropic");
+    send(componentAt(test.mounted, 1), "\u001b");
+    await restored(test.handle);
+    expect(text(test.editor)).toBe(before);
+  });
+
+  it("cycles only authenticated providers", async () => {
+    const test = await harness();
+
+    focus(test.editor, 2);
+    send(test.editor, "\u001b[C");
+    expect(text(test.editor)).toMatch(/Provider\s+other/);
+    send(test.editor, "\u001b[C");
+    expect(text(test.editor)).toMatch(/Provider\s+anthropic/);
   });
 
   it("restricts models to the provider, selects a no-key model and leaves provider unchanged", async () => {

@@ -25,9 +25,10 @@ open per active extension session.
 
 The editor SHALL use select, input, editor, and confirm dialogs, never custom
 terminal components. It SHALL edit name, scope, provider, model, thinking level,
-tools, instructions, hotkey, and order. Unmodified fields SHALL retain their
-values and optional-field presence. Unknown provider, model, and tool names
-SHALL be preservable. Save SHALL NOT require a working API key.
+tools, and instructions, plus hotkey and order in TUI mode only. Unmodified
+fields SHALL retain their values and optional-field presence. Unknown provider,
+model, and tool names SHALL be preservable. Save SHALL NOT require a working API
+key.
 
 #### Scenario: Preserve optional values and whitespace
 
@@ -36,11 +37,90 @@ SHALL be preservable. Save SHALL NOT require a working API key.
 - **WHEN** the user changes only its name and saves
 - **THEN** those other values SHALL remain unchanged
 
+#### Scenario: Choose provider and model IDs without configured authentication
+
+- **GIVEN** the registry contains providers and models without configured
+  authentication
+- **WHEN** the user opens the Provider selection dialog
+- **THEN** only providers with at least one model marked available by Pi's
+  configured-authentication check SHALL appear, once each in registry order
+- **AND** an unauthenticated current provider SHALL remain in the draft but not
+  in the choices, and cancelling SHALL preserve it
+- **AND** manual ID entry SHALL remain available even when no providers qualify
+- **AND** the Model selection dialog SHALL retain `(no key)` suffixes for models
+  without configured authentication
+- **AND** saving such a model SHALL still warn about its missing API key without
+  blocking the save
+
 #### Scenario: Cancel a draft
 
 - **WHEN** a field dialog is cancelled
 - **THEN** its prior value SHALL remain unchanged
 - **AND** leaving a dirty draft SHALL ask before discarding it
+
+### Requirement: RPC editors preserve hidden terminal hotkeys
+
+The RPC editor SHALL NOT display a Hotkey row or offer a hotkey editing action.
+Any editor confirmation summary SHALL omit the hidden field. Editing, saving,
+and duplicating in RPC SHALL preserve existing hotkey values and their optional
+presence. TUI editors SHALL retain their existing hotkey controls and
+validation.
+
+#### Scenario: Save another field without changing a hidden hotkey
+
+- **GIVEN** an existing preset declares a terminal hotkey
+- **WHEN** an RPC user edits another field and saves or duplicates the preset
+- **THEN** the editor SHALL offer no Hotkey action
+- **AND** the stored hotkey SHALL remain unchanged
+- **AND** a new RPC preset SHALL not acquire a hotkey by default
+
+### Requirement: RPC editors preserve hidden order metadata
+
+The RPC editor SHALL NOT display an Order row or offer an order editing action.
+Editing and saving SHALL preserve existing `order` values and optional-field
+presence. TUI standard-dialog editors SHALL retain their Order controls. Move Up
+and Move Down SHALL remain available and reorder the scope's preset array
+independently of the stored `order` field.
+
+#### Scenario: Save without editing hidden order metadata
+
+- **GIVEN** a preset has an omitted, zero, or nonzero `order` value
+- **WHEN** an RPC user edits another field and saves or saves and applies
+- **THEN** the stored `order` value and presence SHALL remain unchanged
+- **AND** a stale Order label SHALL NOT open an editor or change the draft
+
+### Requirement: New presets inherit tools by default
+
+New Preset SHALL default Tools to Inherit by omitting the `tools` field, even
+when the current session has active tools. Editing and duplication SHALL retain
+the source preset's tools and optional-field presence. Explicitly choosing Use
+Active Tools SHALL still pin the current tool list.
+
+#### Scenario: Create with inherited tools
+
+- **GIVEN** the current session has active tools
+- **WHEN** the user creates a preset through the standard-dialog manager in RPC
+  or TUI mode and saves without changing Tools
+- **THEN** the editor SHALL show Tools as Inherit
+- **AND** the saved preset SHALL omit `tools`
+- **AND** applying it SHALL leave the session's active tools unchanged
+
+### Requirement: Model choices show identifiers and names
+
+The standard-dialog Model selector SHALL display numbered JSON-quoted model IDs
+and append `(Name: <JSON-quoted name>)` for every non-blank name, even when the
+name equals the ID. Missing, empty, or whitespace-only names SHALL fall back to
+the ID alone. Existing `(no key)` suffixes and manual ID entry SHALL remain.
+Selection SHALL map the exact displayed option to its original ID, never parse
+the label or save the display name. Provider labels SHALL remain unchanged.
+
+#### Scenario: Select a model with a display name
+
+- **GIVEN** models with distinct IDs share a display name containing quotes or
+  line breaks
+- **WHEN** the user opens the Model dialog and selects an option
+- **THEN** each ID and name SHALL appear JSON-escaped in its own numbered option
+- **AND** saving SHALL preserve the selected model's actual ID
 
 ### Requirement: Editor rows show current draft values
 
@@ -62,8 +142,8 @@ option to its field independently of delimiters in user content.
 The manager SHALL support creation, editing, duplication, deletion, cross-scope
 moves, within-scope reordering, details, status, clear, and activation. Names
 SHALL be unique within a scope, and same-name presets in different scopes SHALL
-remain distinguishable. Duplication SHALL clear the copied hotkey. Moves and
-deletion SHALL require confirmation.
+remain distinguishable. TUI duplication SHALL clear the copied hotkey, while RPC
+duplication SHALL preserve it. Moves and deletion SHALL require confirmation.
 
 #### Scenario: Change an active identity
 

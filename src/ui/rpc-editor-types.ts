@@ -23,6 +23,8 @@ export interface RpcEditorOptions {
   readonly activeTools: readonly string[];
   readonly projectTrusted: boolean;
   readonly issues?: readonly RpcDraftIssue[];
+  /** Terminal-only Hotkey and Order controls, hidden by default for RPC clients. */
+  readonly showTerminalFields?: boolean;
 }
 
 /** Persisted preset values and the scope that will receive them. */

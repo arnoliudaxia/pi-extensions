@@ -15,17 +15,30 @@ does not expose `save`, `edit`, or `rm` subcommands.
 ### Requirement: Searchable provider and model selectors
 
 Pressing Enter on the Provider or Model row SHALL open a selector with an
-immediately editable search field. Provider options SHALL contain distinct known
-providers in registry order. Model options SHALL contain only models belonging
-to the selected provider, including selectable entries marked `(no key)`. Model
-results SHALL display their identifiers so similarly named versions remain
-distinguishable.
+immediately editable search field. Provider options and left/right cycling SHALL
+contain only distinct providers with at least one model for which Pi's
+`hasConfiguredAuth` check succeeds, in registry order. Opening or cancelling the
+selector SHALL preserve an unauthenticated current provider without adding it to
+the choices. If no providers qualify, cycling SHALL leave the draft unchanged.
+Model options SHALL contain only models belonging to the selected provider,
+including selectable entries marked `(no key)`. Model results SHALL display
+their identifiers so similarly named versions remain distinguishable.
 
 The selector SHALL start with an empty query and highlight the current value if
 present, otherwise the first option. Opening it SHALL NOT replace an unknown
 stored value. The form SHALL retain its left/right cycling behavior when no
 selector is open. Focused Provider and Model rows SHALL advertise Enter
 selection in their contextual hints.
+
+#### Scenario: Hide unauthenticated providers
+
+- **GIVEN** some registered providers have no model with configured
+  authentication
+- **WHEN** the user opens the Provider selector or cycles the Provider row
+- **THEN** those providers SHALL NOT appear among the choices
+- **AND** providers with at least one authenticated model SHALL remain
+  selectable
+- **AND** Model options and their availability warnings SHALL remain unchanged
 
 #### Scenario: Open a provider selector
 

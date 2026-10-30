@@ -185,6 +185,7 @@ class PresetManager {
                       .filter((preset) => preset.scope === source.scope)
                       .map((preset) => preset.name),
                   ),
+                  ctx.mode === "rpc",
                 )
               : toPersistedPreset(source),
         }
@@ -195,7 +196,6 @@ class PresetManager {
             provider: ctx.model?.provider ?? "",
             model: ctx.model?.id ?? "",
             thinkingLevel: deps.pi.getThinkingLevel(),
-            tools: [...deps.pi.getActiveTools()],
           },
         };
     let initial: RpcPresetDraft | undefined;
@@ -222,6 +222,7 @@ class PresetManager {
         allTools: deps.pi.getAllTools().map((tool) => tool.name),
         activeTools: deps.pi.getActiveTools(),
         projectTrusted: ctx.isProjectTrusted(),
+        showTerminalFields: ctx.mode === "tui",
         ...(issues ? { issues } : {}),
       });
 

@@ -1,5 +1,5 @@
 /**
- * The editor's provider row, which cycles through the known providers and
+ * The editor's provider row, which cycles through authenticated providers and
  * moves the model and thinking selections along with each change.
  */
 import { selectProvider } from "../draft.js";
@@ -20,7 +20,7 @@ export function makeProviderRow(host: EditorRowHost): EditorRow {
       body: [
         "Press Enter to search, or use left and right to cycle through options.",
         "The provider is the service that hosts the model, like OpenAI or Anthropic.",
-        "Only providers Pi knows about show up here. Switching providers refreshes the model list.",
+        "Only providers with configured authentication show up here. Switching providers refreshes the model list.",
       ],
       title: "Provider",
     },

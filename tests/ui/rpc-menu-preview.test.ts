@@ -9,10 +9,31 @@ const DRAFT: RpcPresetDraft = {
 };
 
 function rows(draft: RpcPresetDraft = DRAFT): string[] {
-  return [...buildRpcMenu(draft).keys()];
+  return [...buildRpcMenu(draft, true).keys()];
 }
 
 describe("RPC menu previews", () => {
+  it("omits terminal-only choices by default without changing the draft", () => {
+    const draft = {
+      ...DRAFT,
+      preset: { ...DRAFT.preset, hotkey: "ctrl+shift+1", order: 0 },
+    };
+    const menu = buildRpcMenu(draft);
+
+    expect([...menu.values()]).not.toContain("hotkey");
+    expect([...menu.keys()].some((row) => row.startsWith("Hotkey:"))).toBe(
+      false,
+    );
+    expect(draft.preset.hotkey).toBe("ctrl+shift+1");
+    expect([...menu.values()]).not.toContain("order");
+    expect([...menu.keys()].some((row) => row.startsWith("Order:"))).toBe(
+      false,
+    );
+    expect(draft.preset.order).toBe(0);
+    expect([...buildRpcMenu(draft, true).values()]).toContain("hotkey");
+    expect([...buildRpcMenu(draft, true).keys()]).toContain("Order: 0");
+  });
+
   it("shows every field, omitted values, and unchanged action labels", () => {
     expect(rows()).toEqual([
       "Name: name",

@@ -1,5 +1,6 @@
 /** Edit every persisted preset field through standard, RPC-compatible dialogs. */
 import { THINKING_LEVELS, type Preset } from "../types.js";
+import { availableProviders } from "./editor/providers.js";
 import {
   cloneRpcDraft,
   sameRpcDraft,
@@ -53,7 +54,7 @@ export async function openRpcEditor(
   showIssues(ui, options.issues ?? []);
 
   for (;;) {
-    const menu = buildRpcMenu(draft);
+    const menu = buildRpcMenu(draft, options.showTerminalFields);
     const selected = await ui.select(options.title, [...menu.keys()]);
     const choice = selected === undefined ? undefined : menu.get(selected);
 
@@ -304,17 +305,15 @@ async function selectId(
   );
   const ids =
     field === "provider"
-      ? [...new Set(options.models.map((model) => model.provider))]
+      ? availableProviders(options.models)
       : models.map((model) => model.id);
   const rows = ids.map((id, index) => {
-    const available =
-      field === "provider"
-        ? options.models.some(
-            (model) => model.provider === id && model.available,
-          )
-        : models[index]?.available;
+    const name = field === "model" ? models[index]?.model.name : undefined;
+    const displayName = name?.trim() ? ` (Name: ${JSON.stringify(name)})` : "";
+    const suffix =
+      field === "model" && !models[index]?.available ? " (no key)" : "";
 
-    return `${index + 1}. ${JSON.stringify(id)}${available ? "" : " (no key)"}`;
+    return `${index + 1}. ${JSON.stringify(id)}${displayName}${suffix}`;
   });
   const choice = await ui.select(
     `${label} (Current: ${JSON.stringify(draft.preset[field])})`,

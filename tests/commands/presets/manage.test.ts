@@ -236,7 +236,7 @@ describe("preset manager dialogs", () => {
     expect(setup.custom).not.toHaveBeenCalled();
   });
 
-  it("seeds creation from current Pi values and includes no-key models", async () => {
+  it("seeds creation with inherited tools while retaining other Pi defaults and no-key models", async () => {
     const setup = harness(["New Preset"]);
 
     await runPresetManager(setup.ctx, setup.deps);
@@ -252,7 +252,6 @@ describe("preset manager dialogs", () => {
             provider: "anthropic",
             model: "baseline",
             thinkingLevel: "low",
-            tools: ["read", "bash"],
           },
         },
         allTools: ["read", "bash"],
@@ -292,45 +291,80 @@ describe("preset manager dialogs", () => {
     );
   });
 
-  it("duplicates losslessly with a unique scoped name and no hotkey", async () => {
-    await writeConfig([
-      { ...PRESET, hotkey: "ctrl+shift+9" },
-      { ...PRESET, name: "Deep Work-copy" },
-    ]);
+  it.each(["rpc", "tui"] as const)(
+    "duplicates with mode-appropriate hotkey preservation in %s",
+    async (mode) => {
+      await writeConfig([
+        { ...PRESET, hotkey: "ctrl+shift+9" },
+        { ...PRESET, name: "Deep Work-copy" },
+      ]);
 
-    const setup = harness(["Duplicate"]);
-    const editor = vi
-      .spyOn(rpcEditor, "openRpcEditor")
-      .mockImplementationOnce((_ui, options) =>
-        Promise.resolve({
-          kind: "submitted",
-          intent: "save",
-          draft: options.baseline,
-        }),
-      );
+      vi.mocked(rpcEditor.openRpcEditor).mockRestore();
 
+      const setup = harness(["Duplicate", "Save"]);
+      const editor = vi.spyOn(rpcEditor, "openRpcEditor");
+      const copy = {
+        ...PRESET,
+        name: "Deep Work-copy-2",
+        ...(mode === "rpc" ? { hotkey: "ctrl+shift+9" } : {}),
+      };
+
+      await runPresetManager({ ...setup.ctx, mode }, setup.deps, {
+        selection: IDENTITY,
+      });
+
+      expect(editor.mock.calls[0]?.[1]).toMatchObject({
+        mode: "duplicate",
+        baseline: {
+          scope: "user",
+          preset: copy,
+        },
+      });
+
+      expect(editor.mock.calls[0]?.[1].showTerminalFields).toBe(mode === "tui");
+      expect(
+        setup.select.mock.calls
+          .flatMap(([, rows]) => rows)
+          .some((row) => row.startsWith("Order: ")),
+      ).toBe(mode === "tui");
+
+      expect(
+        setup.select.mock.calls
+          .flatMap(([, rows]) => rows)
+          .some((row) => row.startsWith("Hotkey: ")),
+      ).toBe(mode === "tui");
+
+      expect(await dirs.readJson(pathFor("user"))).toMatchObject({
+        presets: [expect.anything(), expect.anything(), copy],
+      });
+      expect(setup.setModel).not.toHaveBeenCalled();
+    },
+  );
+
+  it("preserves hidden RPC hotkey and order when editing and saving another field", async () => {
+    await writeConfig([{ ...PRESET, hotkey: "ctrl+shift+9" }]);
+    vi.mocked(rpcEditor.openRpcEditor).mockRestore();
+
+    const setup = harness(["Edit", "Name: Deep Work", "Save"]);
+
+    setup.editor.mockResolvedValueOnce("Renamed");
     await runPresetManager(setup.ctx, setup.deps, { selection: IDENTITY });
 
-    expect(editor.mock.calls[0]?.[1]).toMatchObject({
-      mode: "duplicate",
-      baseline: {
-        scope: "user",
-        preset: { ...PRESET, name: "Deep Work-copy-2" },
-      },
-    });
-
-    expect(editor.mock.calls[0]?.[1].baseline.preset).not.toHaveProperty(
-      "hotkey",
-    );
+    expect(
+      setup.select.mock.calls
+        .flatMap(([, rows]) => rows)
+        .some((row) => row.startsWith("Order: ")),
+    ).toBe(false);
 
     expect(await dirs.readJson(pathFor("user"))).toMatchObject({
-      presets: [
-        expect.anything(),
-        expect.anything(),
-        { ...PRESET, name: "Deep Work-copy-2" },
-      ],
+      presets: [{ ...PRESET, name: "Renamed", hotkey: "ctrl+shift+9" }],
     });
-    expect(setup.setModel).not.toHaveBeenCalled();
+
+    expect(
+      setup.select.mock.calls
+        .flatMap(([, rows]) => rows)
+        .some((row) => row.startsWith("Hotkey: ")),
+    ).toBe(false);
   });
 
   it("shows all persisted fields as read-only JSON and ignores editor output", async () => {
@@ -410,12 +444,19 @@ describe("preset manager dialogs", () => {
             provider: "anthropic",
             model: "baseline",
             thinkingLevel: "low",
-            tools: ["read", "bash"],
             instructions,
           },
         ],
       });
 
+      const saved = await dirs.readJson(pathFor("user"));
+
+      expect(saved).toHaveProperty("presets.0");
+      expect(saved).not.toHaveProperty("presets.0.tools");
+      expect(setup.select.mock.calls[1]?.[1]).toContain(
+        "Tools: Inherit (omitted)",
+      );
+      expect(setup.setActiveTools).not.toHaveBeenCalled();
       expect(setup.session.current()).toMatchObject({
         name: "RPC Created",
         scope: "user",
@@ -430,6 +471,52 @@ describe("preset manager dialogs", () => {
       expect(setup.reload).not.toHaveBeenCalled();
     },
   );
+
+  it("persists the selected model ID rather than its RPC display name", async () => {
+    vi.mocked(rpcEditor.openRpcEditor).mockRestore();
+
+    const setup = harness([
+      "New Preset",
+      "Name: (Empty)",
+      "Model: baseline",
+      '2. "locked" (Name: "Friendly Name") (no key)',
+      "Save",
+    ]);
+    const models = setup.ctx.modelRegistry.getAll().map((model) => ({
+      ...model,
+      name: "Friendly Name",
+    }));
+
+    vi.spyOn(setup.ctx.modelRegistry, "getAll").mockReturnValue(models);
+    setup.editor.mockResolvedValueOnce("Named Model");
+    await runPresetManager(setup.ctx, setup.deps);
+
+    expect(await dirs.readJson(pathFor("user"))).toMatchObject({
+      presets: [
+        { name: "Named Model", provider: "anthropic", model: "locked" },
+      ],
+    });
+  });
+
+  it("still lets a new preset explicitly pin the active tools", async () => {
+    vi.mocked(rpcEditor.openRpcEditor).mockRestore();
+
+    const setup = harness([
+      "New Preset",
+      "Name: (Empty)",
+      "Tools: Inherit (omitted)",
+      "Use Active Tools",
+      "Save",
+    ]);
+
+    setup.editor.mockResolvedValueOnce("Pinned Tools");
+    await runPresetManager(setup.ctx, setup.deps);
+
+    expect(await dirs.readJson(pathFor("user"))).toMatchObject({
+      presets: [{ name: "Pinned Tools", tools: ["read", "bash"] }],
+    });
+    expect(setup.setActiveTools).not.toHaveBeenCalled();
+  });
 
   it("describes dialog exceptions without opening custom UI", async () => {
     const setup = harness();

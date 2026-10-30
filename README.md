@@ -142,15 +142,18 @@ details, or delete it. The main menu also provides status and clear actions.
 Deleting a preset requires confirmation; deleting the active preset does not
 clear its session attachment, so Clear can still restore its baseline.
 
-The editor covers the name, scope, provider, model, thinking level, tools,
-prompt, hotkey, and order fields. Each field row shows its current draft value;
-long values and prompts use compact previews. Selecting a row opens its editor,
-and changes appear in the menu immediately without saving. You can enter
-provider and model identifiers manually, including before credentials or the
-model are available. The tools editor preserves unknown tool names. An omitted
-or empty tools list inherits the session tools; it does not disable every tool.
-The file's array order, changed by Move Up and Move Down, determines display
-order; the optional `order` field is preserved but does not sort the list.
+The editor covers the name, scope, provider, model, thinking level, tools, and
+prompt fields. The Hotkey and Order rows are available only in the terminal; RPC
+and Pi Web hide them while preserving existing values and omitted fields on
+edit, save, and duplication. Terminal duplication still clears the copied hotkey
+to avoid conflicts. Each visible field row shows its current draft value; long
+values and prompts use compact previews. Selecting a row opens its editor, and
+changes appear in the menu immediately without saving. You can enter provider
+and model identifiers manually, including before credentials or the model are
+available. The tools editor preserves unknown tool names. An omitted or empty
+tools list inherits the session tools; it does not disable every tool. The
+file's array order, changed by Move Up and Move Down, determines display order;
+the optional `order` field is preserved but does not sort the list.
 
 - **Save** writes the preset without switching the model or tools.
 - **Save And Apply** writes first, then applies the saved preset through the
@@ -163,9 +166,18 @@ The manager preserves fields you do not edit, including prompt whitespace,
 explicit `off`, empty tools arrays, and `order: 0`. Renaming or moving the
 active preset keeps its session attachment and baseline. Saving its prompt
 changes the instructions used on subsequent turns, even without reapplying.
-Hotkey changes are saved for terminal use and require Pi's `/reload`; this does
-not add browser hotkey handling. The manager uses Save And Apply rather than an
-unsaved draft Test.
+Terminal hotkey changes require Pi's `/reload`; they do not add browser hotkey
+handling. The manager uses Save And Apply rather than an unsaved draft Test.
+
+In RPC clients, Scope, Tools, Thinking level, and Prompt remain functional.
+Project scope requires project trust, and the selected model limits effective
+thinking levels. The `order` field is stored metadata, not a sorting control in
+any mode; use Move Up and Move Down to reorder presets. Directory-based
+automatic activation and terminal preset shortcuts do not run in RPC mode.
+Terminal-only search overlays, row help, key hints, and unsaved draft Test are
+not part of the RPC dialogs. Clients must support Pi's select, editor, and
+confirm requests; shortcut bindings, rich rendering, clipboard integration, and
+other client-side features depend on the external client.
 
 Manager actions include compact Unicode markers, such as `▶ Apply`, `✎ Edit`,
 `⧉ Duplicate`, `↔ Move`, `ⓘ View Details`, and `← Back`. Delete is marked

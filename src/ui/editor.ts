@@ -29,6 +29,7 @@ import {
   selectModel,
   selectProvider,
 } from "./editor/draft.js";
+import { availableProviders } from "./editor/providers.js";
 import { wrapIndex } from "./editor/row-render.js";
 import type { EditorRow, EditorRowHost } from "./editor/row.js";
 import { makeButtonsRow } from "./editor/rows/buttons.js";
@@ -484,7 +485,7 @@ class PresetEditorComponent implements Component, Focusable, EditorRowHost {
   }
 
   providers(): readonly string[] {
-    return [...new Set(this.models.map((item) => item.provider))];
+    return availableProviders(this.models);
   }
 
   /**

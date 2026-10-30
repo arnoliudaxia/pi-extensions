@@ -7,12 +7,20 @@ import type { LoadedPreset, Preset } from "../types.js";
 /**
  * Build the form seed for a duplicated preset.
  *
- * The copy drops `hotkey`, because it lands in the same scope as its
- * source and would otherwise register as a conflict straight away. Every
- * other optional field survives through `toPersistedPreset`.
+ * Terminal copies drop `hotkey` to avoid shortcut conflicts. RPC copies can
+ * preserve it because their editor hides terminal-only shortcut controls.
+ * Every other optional field survives through `toPersistedPreset`.
  */
-export function serializeForCopy(preset: LoadedPreset, name: string): Preset {
-  return toPersistedPreset({ ...preset, name, hotkey: undefined });
+export function serializeForCopy(
+  preset: LoadedPreset,
+  name: string,
+  preserveHotkey = false,
+): Preset {
+  return toPersistedPreset({
+    ...preset,
+    name,
+    hotkey: preserveHotkey ? preset.hotkey : undefined,
+  });
 }
 
 /** Derive a `<name>-copy` name that no preset in the scope already uses. */

@@ -75,6 +75,16 @@ describe("initialState", () => {
     });
   });
 
+  it.each([{ activeTools: [] }, { activeTools: ["read", "bash"] }])(
+    "omits tools when saving a new preset with active tools $activeTools",
+    ({ activeTools }) => {
+      const state = initialState(undefined, fakeModels, activeTools);
+
+      expect(state.toolsMode).toBe("session");
+      expect(buildPreset(state)).not.toHaveProperty("tools");
+    },
+  );
+
   it("falls back to empty provider/model when the registry is empty", () => {
     const state = initialState(undefined, []);
 
